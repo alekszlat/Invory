@@ -1,0 +1,24 @@
+# React dependencies and build output
+node_modules/
+/frontend/dist/
+/frontend/coverage/
+
+# .NET build and test output
+bin/
+obj/
+TestResults/
+
+# Personal editor settings
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Operating system files
+.DS_Store
+Thumbs.db

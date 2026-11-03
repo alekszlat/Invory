@@ -1,0 +1,6 @@
+# Use the same line endings on Linux and Windows
+* text=auto eol=lf
+
+# Windows batch scripts use Windows line endings
+*.bat text eol=crlf
+*.cmd text eol=crlf
