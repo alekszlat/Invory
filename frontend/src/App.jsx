@@ -1,28 +1,22 @@
-import { Box, ClipboardList, FolderTree, History, Inbox, LayoutGrid, Plus } from 'lucide-react';
+import Button, { ActionLink } from './shared/ui/Button.jsx';
 import { useEffect, useState } from 'react';
-import {
-  AssetDetails, AssetDialog, DecisionDialog, InviteDialog, ObservationDialog, RegisterDialog, ScopeDialog, SubregisterDialog,
-} from './components/RegistryDialogs.jsx';
-import { RegisterList, RegisterView } from './components/RegistryViews.jsx';
-import { HistoryView, InvitedList, RequestsView, SubregistersView } from './components/WorkflowViews.jsx';
+import AppShell from './app/AppShell.jsx';
+import { navigateTo, readRoute, registerHref } from './app/navigation.js';
+import AssetDetails from './features/assets/AssetDetails.jsx';
+import AssetDialog from './features/assets/AssetDialog.jsx';
+import RegisterView from './features/assets/RegisterView.jsx';
+import HistoryView from './features/history/HistoryView.jsx';
+import InvitedList from './features/invitations/InvitedList.jsx';
+import RegisterDialog from './features/registers/RegisterDialog.jsx';
+import RegisterList from './features/registers/RegisterList.jsx';
+import { DecisionDialog, ObservationDialog } from './features/requests/RequestDialogs.jsx';
+import RequestsView from './features/requests/RequestsView.jsx';
+import { InviteDialog, ScopeDialog, SubregisterDialog } from './features/subregisters/SubregisterDialogs.jsx';
+import SubregistersView from './features/subregisters/SubregistersView.jsx';
 import {
   addAsset, assignAssets, createRegister, createSubregister, decideRequest, inviteProfile, profiles,
   readRegisters, requestLabels, roleLabels, storageKey, submitObservation, subregisterRole, visibleHistory,
 } from './registryStore.js';
-
-const navigation = [
-  { id: 'register', label: 'Работни регистри', icon: LayoutGrid },
-  { id: 'subregisters', label: 'Подрегистри', icon: FolderTree },
-  { id: 'invited', label: 'Поканени регистри', icon: Inbox },
-  { id: 'requests', label: 'Заявки', icon: ClipboardList },
-  { id: 'history', label: 'История', icon: History },
-];
-const registerHref = id => `#register/${id}`;
-
-function readRoute() {
-  const [section, registerId, subregisterId] = window.location.hash.slice(1).split('/');
-  return { section: navigation.some(page => page.id === section) ? section : 'register', registerId, subregisterId };
-}
 
 function readInitialState() {
   try {
@@ -105,7 +99,7 @@ export default function App() {
     setProfileId(next);
     setDialog(null);
     setNotice('');
-    window.location.hash = section === 'register' ? '' : section;
+    navigateTo(section === 'register' ? '' : section);
     try {
       sessionStorage.setItem('invory.demo.profile', next);
     } catch {
@@ -122,14 +116,14 @@ export default function App() {
   async function saveRegister(values) {
     const result = await createRegister(values, profileId);
     finish(result.registers, 'Регистърът е създаден.');
-    window.location.hash = registerHref(result.register.id);
+    navigateTo(registerHref(result.register.id));
   }
 
   async function saveSubregister(values) {
     const registers = await createSubregister(managed.id, profileId, values);
     const saved = registers.find(entry => entry.id === managed.id).subregisters.at(-1);
     finish(registers, 'Подрегистърът е създаден.');
-    window.location.hash = `subregisters/${managed.id}/${saved.id}`;
+    navigateTo(`subregisters/${managed.id}/${saved.id}`);
   }
 
   function openDialog(type, options = {}) {
@@ -153,11 +147,11 @@ export default function App() {
         return <RegisterView key={shared.id}
           register={{ name: shared.name, description: `Подрегистър към „${source.name}“`, assets }}
           kicker={roleLabels[role]} onOpen={openAsset}
-          extraActions={<a className="button-secondary" href={`#history/${source.id}/${shared.id}`}>История</a>}
+          extraActions={<ActionLink href={`#history/${source.id}/${shared.id}`}>История</ActionLink>}
           assetActions={role === 'participant' ? asset => (
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="button-secondary min-h-9" onClick={() => openDialog('observation', { asset })}>Свери</button>
-              <button type="button" className="button-secondary min-h-9" onClick={() => openDialog('observation', { asset, disposal: true })}>Предложи бракуване</button>
+              <Button type="button" variant="secondary" onClick={() => openDialog('observation', { asset })}>Свери</Button>
+              <Button type="button" variant="secondary" onClick={() => openDialog('observation', { asset, disposal: true })}>Предложи бракуване</Button>
             </div>
           ) : undefined} />;
       }
@@ -170,12 +164,12 @@ export default function App() {
       default:
         if (register) {
           return <RegisterView key={register.id} register={register} onAdd={() => openDialog('asset')} onOpen={openAsset}
-            extraActions={<a className="button-secondary" href={`#subregisters/${register.id}`}>Подрегистри</a>} />;
+            extraActions={<ActionLink href={`#subregisters/${register.id}`}>Подрегистри</ActionLink>} />;
         }
         if (registerId) {
-          return <div className="space-y-4 rounded-2xl border border-line bg-white p-6">
-            <h1 className="text-2xl font-bold">Регистърът не е достъпен за този профил</h1>
-            <a href="#" className="button-secondary">Към работните регистри</a>
+          return <div className="min-w-0 rounded-2xl border border-[#dcdde3] dark:border-[#3b3d46] bg-white dark:bg-[#232429] p-5 sm:p-6 shadow-[0_2px_8px_rgb(24_32_48/0.03)] dark:shadow-none space-y-4">
+            <h1 className="text-2xl font-semibold">Регистърът не е достъпен за този профил</h1>
+            <ActionLink href="#">Към работните регистри</ActionLink>
           </div>;
         }
         return <RegisterList registers={owned} onCreate={() => openDialog('register')} registerHref={registerHref} />;
@@ -183,49 +177,12 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[230px_minmax(0,1fr)]">
-      <aside className="flex flex-col gap-5 bg-sidebar px-4 py-4 text-white sm:px-6 md:sticky md:top-0 md:h-dvh md:gap-8 md:px-5 md:py-7">
-        <a href="#" className="flex w-fit items-center gap-3 text-2xl font-bold tracking-tight">
-          <span className="grid size-10 -rotate-4 place-items-center rounded-xl bg-[#d76d47]">
-            <Box size={23} strokeWidth={1.7} className="rotate-4" aria-hidden="true" />
-          </span>
-          invory
-        </a>
-        <nav className="flex flex-wrap gap-2 md:grid" aria-label="Основна навигация">
-          {navigation.map(({ id, label, icon: Icon }) => (
-            <a key={id} href={id === 'register' ? '#' : `#${id}`} onClick={() => setNotice('')}
-              aria-current={section === id ? 'page' : undefined}
-              className={`flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold hover:bg-[#334641] ${section === id ? 'bg-[#374c43] text-[#ffe0d0]' : 'text-[#d5e1da]'}`}>
-              <Icon size={18} className="shrink-0" aria-hidden="true" />
-              {label}
-              {id === 'requests' && pendingCount > 0 && <span className="ml-auto rounded bg-[#d76d47] px-1.5 text-xs text-sidebar">{pendingCount}</span>}
-            </a>
-          ))}
-        </nav>
-        <button type="button" onClick={() => openDialog('register')} className="hidden min-h-11 items-center gap-2.5 rounded-lg border border-sidebar-line px-3 py-2 text-left text-sm font-semibold text-[#ecf1ec] hover:bg-[#334641] md:mt-auto md:flex">
-          <Plus size={18} aria-hidden="true" />
-          Нов регистър
-        </button>
-      </aside>
-
-      <div className="min-w-0">
-        <header className="border-b border-line bg-white">
-          <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-8">
-            <p className="text-sm font-semibold text-muted">{navigation.find(page => page.id === section).label}</p>
-            <label className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-              Демо профил
-              <select className="field-control w-auto" value={profileId} onChange={event => switchProfile(event.target.value)}>
-                {profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
-              </select>
-            </label>
-          </div>
-        </header>
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
-          {data.error && <p role="alert" className="mb-4 rounded-lg border border-line bg-white p-3 text-sm">{data.error}</p>}
-          {notice && <p role="status" className="mb-4 rounded-lg border border-line bg-sage px-4 py-3 text-sm font-medium text-sage-ink">{notice}</p>}
-          {renderView()}
-        </main>
-      </div>
+    <>
+      <AppShell section={section} pendingCount={pendingCount} profileId={profileId}
+        onSwitchProfile={switchProfile} onNavigate={() => setNotice('')} onCreate={() => openDialog('register')}
+        error={data.error} notice={notice}>
+        {renderView()}
+      </AppShell>
 
       {dialog?.type === 'register' && <RegisterDialog onClose={close} onSave={saveRegister} />}
       {dialog?.type === 'asset' && register && <AssetDialog registerName={register.name} onClose={close}
@@ -246,6 +203,6 @@ export default function App() {
           await decideRequest(dialog.id, dialog.request.id, profileId, dialog.decision, values.reason),
           'Решението е записано.',
         )} />}
-    </div>
+    </>
   );
 }
