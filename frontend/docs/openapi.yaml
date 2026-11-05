@@ -1,0 +1,1961 @@
+openapi: 3.1.0
+info:
+  title: Invory API
+  version: 1.0.0
+  description: >-
+    Register, asset, sharing, request, and history contract. The browser mock implements the same resource operations.
+    Authentication uses a short-lived JWT access token and an HttpOnly refresh cookie in the real backend.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Authentication
+  - name: Registers
+  - name: Assets
+  - name: Subregisters
+  - name: Sharing
+  - name: Requests
+  - name: History
+x-auth-errors:
+  '400':
+    $ref: '#/components/responses/Error'
+  '401':
+    $ref: '#/components/responses/Error'
+  '422':
+    $ref: '#/components/responses/Error'
+  default:
+    $ref: '#/components/responses/Error'
+x-read-errors:
+  '401':
+    $ref: '#/components/responses/Error'
+  '403':
+    $ref: '#/components/responses/Error'
+  '404':
+    $ref: '#/components/responses/Error'
+  '422':
+    $ref: '#/components/responses/Error'
+  default:
+    $ref: '#/components/responses/Error'
+x-write-errors:
+  '400':
+    $ref: '#/components/responses/Error'
+  '401':
+    $ref: '#/components/responses/Error'
+  '403':
+    $ref: '#/components/responses/Error'
+  '404':
+    $ref: '#/components/responses/Error'
+  '409':
+    $ref: '#/components/responses/Error'
+  '422':
+    $ref: '#/components/responses/Error'
+  default:
+    $ref: '#/components/responses/Error'
+x-invite-errors:
+  '401':
+    $ref: '#/components/responses/Error'
+  '404':
+    $ref: '#/components/responses/Error'
+  '409':
+    $ref: '#/components/responses/Error'
+  '410':
+    $ref: '#/components/responses/Error'
+  default:
+    $ref: '#/components/responses/Error'
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register and start a session
+      operationId: registerAccount
+      security: []
+      requestBody:
+        $ref: '#/components/requestBodies/RegisterAccount'
+      responses:
+        '201':
+          $ref: '#/components/responses/SessionCreated'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Start a session
+      operationId: login
+      security: []
+      requestBody:
+        $ref: '#/components/requestBodies/Login'
+      responses:
+        '200':
+          $ref: '#/components/responses/Session'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get the current authenticated user
+      operationId: currentUser
+      responses:
+        '200':
+          $ref: '#/components/responses/User'
+        '401':
+          $ref: '#/components/responses/Error'
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Renew the session
+      operationId: refreshSession
+      security:
+        - refreshCookie: []
+      responses:
+        '200':
+          $ref: '#/components/responses/Session'
+        '401':
+          $ref: '#/components/responses/Error'
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: End the session
+      operationId: logout
+      responses:
+        '204':
+          description: Session ended; empty body
+        '401':
+          $ref: '#/components/responses/Error'
+  /registers:
+    get:
+      tags:
+        - Registers
+      summary: List registers owned by the current account
+      operationId: listRegisters
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/RegisterList'
+        '401':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+        - Registers
+      summary: Create a register owned by the current account
+      operationId: createRegister
+      requestBody:
+        $ref: '#/components/requestBodies/RegisterCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/RegisterCreated'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /registers/{registerId}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterId'
+    get:
+      tags:
+        - Registers
+      summary: Get an owned register
+      operationId: getRegister
+      responses:
+        '200':
+          $ref: '#/components/responses/Register'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+        - Registers
+      summary: Update an owned register
+      operationId: updateRegister
+      requestBody:
+        $ref: '#/components/requestBodies/RegisterPatch'
+      responses:
+        '200':
+          $ref: '#/components/responses/Register'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /registers/{registerId}/assets:
+    parameters:
+      - $ref: '#/components/parameters/RegisterId'
+    get:
+      tags:
+        - Assets
+      summary: List, search, and filter assets in an accessible scope
+      operationId: listAssets
+      parameters:
+        - $ref: '#/components/parameters/SubregisterFilter'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Case-insensitive search across name, inventory number, location, and custodian
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/AssetStatus'
+        - name: location
+          in: query
+          schema:
+            type: string
+        - name: custodian
+          in: query
+          schema:
+            type: string
+        - name: includeArchived
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/AssetList'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+        - Assets
+      summary: Add a canonical asset; owner only
+      operationId: createAsset
+      requestBody:
+        $ref: '#/components/requestBodies/AssetCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/AssetCreated'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /registers/{registerId}/assets/{assetId}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterId'
+      - $ref: '#/components/parameters/AssetId'
+    get:
+      tags:
+        - Assets
+      summary: Get an accessible canonical asset
+      operationId: getAsset
+      parameters:
+        - $ref: '#/components/parameters/SubregisterFilter'
+      responses:
+        '200':
+          $ref: '#/components/responses/Asset'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+        - Assets
+      summary: Edit any asset field; owner only
+      operationId: updateAsset
+      requestBody:
+        $ref: '#/components/requestBodies/AssetPatch'
+      responses:
+        '200':
+          $ref: '#/components/responses/Asset'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+        - Assets
+      summary: Archive an asset; retain its record and history
+      operationId: archiveAsset
+      responses:
+        '200':
+          $ref: '#/components/responses/Asset'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /registers/{registerId}/subregisters:
+    parameters:
+      - $ref: '#/components/parameters/RegisterId'
+    get:
+      tags:
+        - Subregisters
+      summary: List child scopes; owner only
+      operationId: listSubregisters
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SubregisterList'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+        - Subregisters
+      summary: Create a child scope; owner only
+      operationId: createSubregister
+      requestBody:
+        $ref: '#/components/requestBodies/SubregisterCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/SubregisterCreated'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /registers/{registerId}/subregisters/{subregisterId}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterId'
+      - $ref: '#/components/parameters/SubregisterId'
+    get:
+      tags:
+        - Subregisters
+      summary: Get an accessible child scope and permissions
+      operationId: getSubregister
+      responses:
+        '200':
+          $ref: '#/components/responses/Subregister'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+        - Subregisters
+      summary: Rename a scope or replace selected parent asset references; owner only
+      operationId: updateSubregister
+      requestBody:
+        $ref: '#/components/requestBodies/SubregisterPatch'
+      responses:
+        '200':
+          $ref: '#/components/responses/Subregister'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /registers/{registerId}/subregisters/{subregisterId}/invitations:
+    parameters:
+      - $ref: '#/components/parameters/RegisterId'
+      - $ref: '#/components/parameters/SubregisterId'
+    get:
+      tags:
+        - Sharing
+      summary: List generated links; owner only
+      operationId: listInvitations
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/InvitationList'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+        - Sharing
+      summary: Generate a role-bound expiring invitation link; owner only
+      operationId: createInvitation
+      requestBody:
+        $ref: '#/components/requestBodies/InvitationCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/InvitationCreated'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /invitations/{invitationId}:
+    parameters:
+      - $ref: '#/components/parameters/InvitationId'
+    delete:
+      tags:
+        - Sharing
+      summary: Revoke future use of a link; owner only
+      operationId: revokeInvitation
+      responses:
+        '200':
+          $ref: '#/components/responses/Invitation'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /invitations/{token}/accept:
+    parameters:
+      - $ref: '#/components/parameters/Token'
+    post:
+      tags:
+        - Sharing
+      summary: Accept the token's stored role and scope as the authenticated account
+      operationId: acceptInvitation
+      responses:
+        '200':
+          $ref: '#/components/responses/Subregister'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '410':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /invited-scopes:
+    get:
+      tags:
+        - Sharing
+      summary: List accepted subregisters for the current account
+      operationId: listInvitedScopes
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SubregisterList'
+        '401':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /registers/{registerId}/subregisters/{subregisterId}/memberships:
+    parameters:
+      - $ref: '#/components/parameters/RegisterId'
+      - $ref: '#/components/parameters/SubregisterId'
+    get:
+      tags:
+        - Sharing
+      summary: List members of a subregister; owner only
+      operationId: listMemberships
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/MembershipList'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /registers/{registerId}/subregisters/{subregisterId}/memberships/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterId'
+      - $ref: '#/components/parameters/SubregisterId'
+      - $ref: '#/components/parameters/UserId'
+    patch:
+      tags:
+        - Sharing
+      summary: Change a member's scoped role; owner only
+      operationId: updateMembership
+      requestBody:
+        $ref: '#/components/requestBodies/MembershipPatch'
+      responses:
+        '200':
+          $ref: '#/components/responses/Membership'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+        - Sharing
+      summary: Remove a member's scoped access; owner only
+      operationId: deleteMembership
+      responses:
+        '204':
+          description: Membership removed; empty body
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /requests:
+    get:
+      tags:
+        - Requests
+      summary: List incoming owner requests or own participant submissions
+      operationId: listRequests
+      parameters:
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum:
+              - incoming
+              - submitted
+            default: incoming
+        - name: registerId
+          in: query
+          schema:
+            type: string
+        - name: subregisterId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/RequestStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/RequestList'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /registers/{registerId}/requests:
+    parameters:
+      - $ref: '#/components/parameters/RegisterId'
+    post:
+      tags:
+        - Requests
+      summary: Submit an inventory check or change proposal; scoped participant only
+      operationId: createRequest
+      requestBody:
+        $ref: '#/components/requestBodies/RequestCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/RequestCreated'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /requests/{requestId}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    patch:
+      tags:
+        - Requests
+      summary: Atomically decide a pending request, apply an approved change, and record history
+      operationId: decideRequest
+      requestBody:
+        $ref: '#/components/requestBodies/RequestDecision'
+      responses:
+        '200':
+          $ref: '#/components/responses/Request'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /registers/{registerId}/history:
+    parameters:
+      - $ref: '#/components/parameters/RegisterId'
+    get:
+      tags:
+        - History
+      summary: Read history permitted by register or subregister membership
+      operationId: listHistory
+      parameters:
+        - $ref: '#/components/parameters/SubregisterFilter'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/HistoryList'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Short-lived JWT access token sent in the Authorization header
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: invory_refresh
+      description: HttpOnly Secure SameSite refresh cookie; rotated by the backend
+  parameters:
+    RegisterId:
+      name: registerId
+      in: path
+      required: true
+      schema:
+        type: string
+    AssetId:
+      name: assetId
+      in: path
+      required: true
+      schema:
+        type: string
+    SubregisterId:
+      name: subregisterId
+      in: path
+      required: true
+      schema:
+        type: string
+    InvitationId:
+      name: invitationId
+      in: path
+      required: true
+      schema:
+        type: string
+    Token:
+      name: token
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Opaque server-stored invitation token
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+    RequestId:
+      name: requestId
+      in: path
+      required: true
+      schema:
+        type: string
+    SubregisterFilter:
+      name: subregisterId
+      in: query
+      schema:
+        type: string
+      description: Required for non-owners; narrows owner reads
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  requestBodies:
+    RegisterAccount:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AccountRegistration'
+          example:
+            name: Елена Петрова
+            email: elena@example.test
+            password: example-password
+    Login:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LoginInput'
+          example:
+            email: elena@example.test
+            password: example-password
+    RegisterCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegisterInput'
+          example:
+            name: Лаборатория
+            description: Етаж 2
+    RegisterPatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegisterPatch'
+          example:
+            name: Лаборатория 2
+    AssetCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AssetInput'
+          example:
+            name: Монитор Dell 24″
+            inventoryNumber: INV-008
+            location: Каб. 302
+            custodian: Иван
+            acquiredOn: '2026-10-01'
+            unit: бр.
+            quantity: 1
+            status: Активен
+            sourceDocument: Протокол 12
+    AssetPatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AssetPatch'
+          example:
+            location: Каб. 303
+            expectedVersion: 1
+    SubregisterCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SubregisterInput'
+          example:
+            name: Каб. 302
+    SubregisterPatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SubregisterPatch'
+          example:
+            assetIds:
+              - asset_8
+            expectedVersion: 1
+    InvitationCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/InvitationInput'
+          example:
+            role: participant
+            expiresAt: '2026-11-12T10:00:00.000Z'
+    MembershipPatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MembershipPatch'
+          example:
+            role: guest
+    RequestCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RequestInput'
+          example:
+            subregisterId: sub_5
+            assetId: asset_8
+            assetVersion: 1
+            kind: location
+            note: Преместен при инвентаризация
+            location: Каб. 303
+    RequestDecision:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RequestDecision'
+          example:
+            status: approved
+            reason: ''
+  responses:
+    Error:
+      description: Structured API error; status and code identify the failure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    User:
+      description: Current user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/User'
+    Session:
+      description: Access token and current user; login and refresh also set or rotate the HttpOnly refresh cookie
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Session'
+    SessionCreated:
+      description: Created account and access token; also sets the HttpOnly refresh cookie
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Session'
+    Register:
+      description: Saved register
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Register'
+    RegisterCreated:
+      description: Created register
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Register'
+    RegisterList:
+      description: Owned registers
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegisterList'
+    Asset:
+      description: Saved canonical asset
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Asset'
+    AssetCreated:
+      description: Created canonical asset
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Asset'
+    AssetList:
+      description: Accessible assets
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AssetList'
+    Subregister:
+      description: Accessible child scope
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Subregister'
+    SubregisterCreated:
+      description: Created child scope
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Subregister'
+    SubregisterList:
+      description: Child scopes
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SubregisterList'
+    Invitation:
+      description: Invitation link
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Invitation'
+    InvitationCreated:
+      description: Created invitation link
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Invitation'
+    InvitationList:
+      description: Invitation links
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/InvitationList'
+    Membership:
+      description: Saved membership
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Membership'
+    MembershipList:
+      description: Members
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MembershipList'
+    Request:
+      description: Resolved request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ChangeRequest'
+    RequestCreated:
+      description: Created inventory result or request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ChangeRequest'
+    RequestList:
+      description: Requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RequestList'
+    HistoryList:
+      description: Permitted history
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HistoryList'
+  schemas:
+    User:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: string
+          example: accounting
+        name:
+          type: string
+          example: Елена · Счетоводство
+        email:
+          type: string
+          format: email
+          example: elena@example.test
+    Session:
+      type: object
+      additionalProperties: false
+      required:
+        - user
+        - accessToken
+        - expiresAt
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        accessToken:
+          type: string
+          description: Short-lived JWT access token; keep in browser memory only
+          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhY2NvdW50aW5nIn0.signature
+        expiresAt:
+          type: string
+          format: date-time
+          example: '2026-11-05T10:45:00.000Z'
+    AccountRegistration:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          writeOnly: true
+    LoginInput:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          writeOnly: true
+    Pagination:
+      type: object
+      additionalProperties: false
+      required:
+        - page
+        - pageSize
+        - totalItems
+        - totalPages
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          example: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 20
+        totalItems:
+          type: integer
+          minimum: 0
+          example: 1
+        totalPages:
+          type: integer
+          minimum: 0
+          example: 1
+    Role:
+      type: string
+      enum:
+        - owner
+        - participant
+        - guest
+    SharedRole:
+      type: string
+      enum:
+        - participant
+        - guest
+    Permission:
+      type: string
+      enum:
+        - read
+        - manage
+        - share
+        - decide
+        - check
+        - request
+    AssetStatus:
+      type: string
+      enum:
+        - Активен
+        - За ремонт
+        - Бракуван
+    RequestStatus:
+      type: string
+      enum:
+        - pending
+        - approved
+        - rejected
+    RequestKind:
+      type: string
+      enum:
+        - present
+        - missing
+        - location
+        - disposal
+    Register:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+        - owner
+        - assetCount
+        - role
+        - permissions
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          example: reg_42
+        name:
+          type: string
+          example: Лаборатория
+        description:
+          type: string
+          example: Етаж 2
+        owner:
+          $ref: '#/components/schemas/User'
+        assetCount:
+          type: integer
+          minimum: 0
+          description: Non-archived assets
+          example: 1
+        role:
+          $ref: '#/components/schemas/Role'
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+          example:
+            - read
+            - manage
+            - share
+            - decide
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    RegisterInput:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 300
+          default: ''
+    RegisterPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 300
+    Asset:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - registerId
+        - name
+        - inventoryNumber
+        - location
+        - custodian
+        - acquiredOn
+        - unit
+        - quantity
+        - status
+        - sourceDocument
+        - archivedAt
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          example: asset_8
+        registerId:
+          type: string
+          example: reg_42
+        name:
+          type: string
+          example: Монитор Dell 24″
+        inventoryNumber:
+          type: string
+          example: INV-008
+        location:
+          type: string
+          example: Каб. 302
+        custodian:
+          type: string
+          example: Иван
+        acquiredOn:
+          type:
+            - string
+            - 'null'
+          format: date
+          example: '2026-10-01'
+        unit:
+          type: string
+          example: бр.
+        quantity:
+          type: number
+          exclusiveMinimum: 0
+          example: 1
+        status:
+          $ref: '#/components/schemas/AssetStatus'
+        sourceDocument:
+          type: string
+          example: Протокол 12
+        archivedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          example: null
+        version:
+          type: integer
+          minimum: 1
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AssetInput:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - inventoryNumber
+        - location
+        - quantity
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        inventoryNumber:
+          type: string
+          minLength: 1
+          maxLength: 60
+        location:
+          type: string
+          minLength: 1
+          maxLength: 120
+        custodian:
+          type: string
+          maxLength: 120
+          default: ''
+        acquiredOn:
+          type:
+            - string
+            - 'null'
+          format: date
+          default: null
+        unit:
+          type: string
+          maxLength: 12
+          default: бр.
+        quantity:
+          type: number
+          exclusiveMinimum: 0
+        status:
+          $ref: '#/components/schemas/AssetStatus'
+        sourceDocument:
+          type: string
+          maxLength: 200
+          default: ''
+    AssetPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      anyOf:
+        - required: [name]
+        - required: [inventoryNumber]
+        - required: [location]
+        - required: [custodian]
+        - required: [acquiredOn]
+        - required: [unit]
+        - required: [quantity]
+        - required: [status]
+        - required: [sourceDocument]
+      properties:
+        expectedVersion:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        inventoryNumber:
+          type: string
+          minLength: 1
+          maxLength: 60
+        location:
+          type: string
+          minLength: 1
+          maxLength: 120
+        custodian:
+          type: string
+          maxLength: 120
+          default: ''
+        acquiredOn:
+          type:
+            - string
+            - 'null'
+          format: date
+          default: null
+        unit:
+          type: string
+          maxLength: 12
+          default: бр.
+        quantity:
+          type: number
+          exclusiveMinimum: 0
+        status:
+          $ref: '#/components/schemas/AssetStatus'
+        sourceDocument:
+          type: string
+          maxLength: 200
+          default: ''
+    Subregister:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - registerId
+        - name
+        - assetIds
+        - version
+        - createdAt
+        - updatedAt
+        - registerName
+        - memberCount
+        - role
+        - permissions
+      properties:
+        id:
+          type: string
+          example: sub_5
+        registerId:
+          type: string
+          example: reg_42
+        name:
+          type: string
+          example: Каб. 302
+        assetIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+          example:
+            - asset_8
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        registerName:
+          type: string
+          example: Лаборатория
+        memberCount:
+          type: integer
+          minimum: 0
+        role:
+          $ref: '#/components/schemas/Role'
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+    SubregisterInput:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+    SubregisterPatch:
+      type: object
+      additionalProperties: false
+      anyOf:
+        - required: [name]
+        - required: [assetIds]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        assetIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        expectedVersion:
+          type: integer
+          minimum: 1
+      description: At least one of name or assetIds is required; expectedVersion alone is invalid.
+    Invitation:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - registerId
+        - subregisterId
+        - role
+        - token
+        - expiresAt
+        - revokedAt
+        - createdAt
+      properties:
+        id:
+          type: string
+          example: invite_7
+        registerId:
+          type: string
+          example: reg_42
+        subregisterId:
+          type: string
+          example: sub_5
+        role:
+          $ref: '#/components/schemas/SharedRole'
+        token:
+          type: string
+          example: opaque-random-token
+        expiresAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    InvitationInput:
+      type: object
+      additionalProperties: false
+      required:
+        - role
+        - expiresAt
+      properties:
+        role:
+          $ref: '#/components/schemas/SharedRole'
+        expiresAt:
+          type: string
+          format: date-time
+          description: Must be in the future
+    Membership:
+      type: object
+      additionalProperties: false
+      required:
+        - subregisterId
+        - role
+        - createdAt
+        - user
+      properties:
+        subregisterId:
+          type: string
+          example: sub_5
+        role:
+          $ref: '#/components/schemas/SharedRole'
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/User'
+    MembershipPatch:
+      type: object
+      additionalProperties: false
+      required:
+        - role
+      properties:
+        role:
+          $ref: '#/components/schemas/SharedRole'
+    NamedRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    AssetReference:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - inventoryNumber
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        inventoryNumber:
+          type: string
+    ChangeRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - registerId
+        - subregisterId
+        - assetId
+        - kind
+        - note
+        - location
+        - originalLocation
+        - originalStatus
+        - originalAssetVersion
+        - status
+        - reason
+        - createdAt
+        - decidedAt
+        - register
+        - subregister
+        - asset
+        - requester
+        - decidedBy
+      properties:
+        id:
+          type: string
+          example: req_9
+        registerId:
+          type: string
+        subregisterId:
+          type: string
+        assetId:
+          type: string
+        kind:
+          $ref: '#/components/schemas/RequestKind'
+        note:
+          type: string
+        location:
+          type: string
+        originalLocation:
+          type: string
+        originalStatus:
+          $ref: '#/components/schemas/AssetStatus'
+        originalAssetVersion:
+          type: integer
+          minimum: 1
+        status:
+          $ref: '#/components/schemas/RequestStatus'
+        reason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        register:
+          $ref: '#/components/schemas/NamedRecord'
+        subregister:
+          $ref: '#/components/schemas/NamedRecord'
+        asset:
+          $ref: '#/components/schemas/AssetReference'
+        requester:
+          $ref: '#/components/schemas/User'
+        decidedBy:
+          oneOf:
+            - $ref: '#/components/schemas/User'
+            - type: 'null'
+    RequestInput:
+      type: object
+      additionalProperties: false
+      required:
+        - subregisterId
+        - assetId
+        - assetVersion
+        - kind
+      allOf:
+        - if:
+            properties:
+              kind:
+                enum: [missing, location, disposal]
+          then:
+            required: [note]
+            properties:
+              note: { type: string, minLength: 1 }
+        - if:
+            properties:
+              kind:
+                const: location
+          then:
+            required: [location]
+            properties:
+              location: { type: string, minLength: 1 }
+      properties:
+        subregisterId:
+          type: string
+        assetId:
+          type: string
+        assetVersion:
+          type: integer
+          minimum: 1
+        kind:
+          $ref: '#/components/schemas/RequestKind'
+        note:
+          type: string
+          maxLength: 500
+          description: Required except for present
+        location:
+          type: string
+          maxLength: 120
+          description: Required only for location kind
+    RequestDecision:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      if:
+        properties:
+          status:
+            const: rejected
+      then:
+        required: [reason]
+        properties:
+          reason: { type: string, minLength: 1 }
+      properties:
+        status:
+          type: string
+          enum:
+            - approved
+            - rejected
+        reason:
+          type: string
+          maxLength: 500
+          description: Required for rejection
+    HistoryEvent:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - registerId
+        - subregisterId
+        - assetId
+        - at
+        - title
+        - details
+        - actor
+      properties:
+        id:
+          type: string
+          example: event_10
+        registerId:
+          type: string
+        subregisterId:
+          type:
+            - string
+            - 'null'
+        assetId:
+          type:
+            - string
+            - 'null'
+        at:
+          type: string
+          format: date-time
+        title:
+          type: string
+          example: Одобрена заявка
+        details:
+          type: string
+          example: Промяна на местоположение · Монитор Dell 24″
+        actor:
+          $ref: '#/components/schemas/User'
+    RegisterList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - pagination
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Register'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    AssetList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - pagination
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asset'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    SubregisterList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - pagination
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subregister'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    InvitationList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - pagination
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invitation'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    MembershipList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - pagination
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Membership'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    RequestList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - pagination
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChangeRequest'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    HistoryList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - pagination
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoryEvent'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    Error:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - fields
+        - traceId
+      properties:
+        code:
+          type: string
+          example: DUPLICATE_INVENTORY_NUMBER
+        message:
+          type: string
+          example: В този регистър вече има актив с този инвентарен номер.
+        fields:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            inventoryNumber:
+              - Номерът вече се използва.
+        traceId:
+          type: string
+          example: trace_123
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/Error'

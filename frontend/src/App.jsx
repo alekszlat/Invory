@@ -1,8 +1,20 @@
-import Button, { ActionLink } from './shared/ui/Button.jsx';
 import { useEffect, useState } from 'react';
+import { useQueries, useQuery } from '@tanstack/react-query';
+import Button, { ActionLink } from './shared/ui/Button.jsx';
 import AppShell from './app/AppShell.jsx';
 import { navigateTo, readRoute, registerHref } from './app/navigation.js';
+import { allPages, configureSessionExpired } from './api/client.js';
+import { authApi } from './api/auth.js';
+import { registersApi } from './api/registers.js';
+import { assetsApi } from './api/assets.js';
+import { subregistersApi } from './api/subregisters.js';
+import { sharingApi } from './api/sharing.js';
+import { requestsApi } from './api/requests.js';
+import { historyApi } from './api/history.js';
+import { clearPrivateCache, queryClient, useApiQuery } from './api/query.js';
+import { requestLabels, roleLabels } from './shared/labels.js';
 import AssetDetails from './features/assets/AssetDetails.jsx';
+import LoginPage from './features/auth/LoginPage.jsx';
 import AssetDialog from './features/assets/AssetDialog.jsx';
 import RegisterView from './features/assets/RegisterView.jsx';
 import HistoryView from './features/history/HistoryView.jsx';
@@ -13,196 +25,218 @@ import { DecisionDialog, ObservationDialog } from './features/requests/RequestDi
 import RequestsView from './features/requests/RequestsView.jsx';
 import { InviteDialog, ScopeDialog, SubregisterDialog } from './features/subregisters/SubregisterDialogs.jsx';
 import SubregistersView from './features/subregisters/SubregistersView.jsx';
-import {
-  addAsset, assignAssets, createRegister, createSubregister, decideRequest, inviteProfile, profiles,
-  readRegisters, requestLabels, roleLabels, storageKey, submitObservation, subregisterRole, visibleHistory,
-} from './registryStore.js';
 
-function readInitialState() {
-  try {
-    return { registers: readRegisters(), error: '' };
-  } catch {
-    return { registers: [], error: 'Запазените регистри не могат да се прочетат в този браузър.' };
-  }
+function AcceptInvitation({ token, onAccept, pending, error }) {
+  return <div className="rounded-2xl border border-[#dcdde3] bg-white p-6 dark:border-[#3b3d46] dark:bg-[#232429]">
+    <h1 className="text-2xl font-semibold">Покана за подрегистър</h1>
+    <p className="mt-2 text-sm text-[#62646c] dark:text-[#b0b2be]">Приемете поканата с избрания профил. Ролята и обхватът се определят от връзката.</p>
+    {error && <p role="alert" className="mt-3 text-sm text-[#b32830] dark:text-[#ffb1b8]">{error}</p>}
+    <div className="mt-5"><Button type="button" disabled={pending} onClick={() => onAccept(token)}>{pending ? 'Приемане…' : 'Приеми поканата'}</Button></div>
+  </div>;
 }
 
-function initialProfile() {
-  try {
-    const id = sessionStorage.getItem('invory.demo.profile');
-    if (profiles.some(profile => profile.id === id)) return id;
-  } catch {
-    // The profile selector also works without session storage.
-  }
-  return profiles[0].id;
-}
-
-export default function App() {
-  const [data, setData] = useState(readInitialState);
+export default function App({ demo }) {
+  const [sessionKey, setSessionKey] = useState('initial');
   const [route, setRoute] = useState(readRoute);
-  const [profileId, setProfileId] = useState(initialProfile);
   const [dialog, setDialog] = useState(null);
   const [notice, setNotice] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [accepting, setAccepting] = useState(false);
   const { section, registerId, subregisterId } = route;
-  const owned = data.registers.filter(entry => entry.ownerId === profileId);
+  const me = useQuery({ queryKey: ['auth', sessionKey], queryFn: authApi.refresh, retry: false });
+  const userId = me.data?.user.id;
+  const ownedQuery = useApiQuery(userId, 'registers', {}, signal => allPages(registersApi.list, {}, signal));
+  const invitedQuery = useApiQuery(userId, 'invited-scopes', {}, signal => allPages(sharingApi.invited, {}, signal));
+  const owned = ownedQuery.data ?? [];
+  const invitations = invitedQuery.data ?? [];
   const register = owned.find(entry => entry.id === registerId);
   const managed = register ?? owned[0];
-  const subregister = managed?.subregisters.find(entry => entry.id === subregisterId) ?? managed?.subregisters[0];
-  const invitations = data.registers.filter(entry => entry.ownerId !== profileId).flatMap(entry =>
-    entry.subregisters.flatMap(sub => {
-      const role = subregisterRole(entry, sub, profileId);
-      return role ? [{ register: entry, subregister: sub, role }] : [];
-    }),
-  );
-  const invitation = invitations.find(entry => entry.register.id === registerId && entry.subregister.id === subregisterId);
-  const detailsId = dialog?.type === 'details' ? dialog.asset.id : undefined;
-  const detailsAsset = register?.assets.find(asset => asset.id === detailsId)
-    ?? (invitation?.subregister.assetIds.includes(detailsId)
-      ? invitation.register.assets.find(asset => asset.id === detailsId) : undefined);
-  const incoming = owned.flatMap(entry => entry.requests.map(request => ({ register: entry, request })));
-  const submitted = invitations.filter(entry => entry.role === 'participant').flatMap(({ register, subregister: sub }) =>
-    register.requests
-      .filter(request => request.requesterId === profileId && request.subregisterId === sub.id && sub.assetIds.includes(request.assetId))
-      .map(request => ({ register, request })),
-  );
+  const subQueries = useQueries({ queries: owned.map(entry => ({
+    queryKey: ['user', userId, 'subregisters', entry.id],
+    queryFn: ({ signal }) => allPages((params, nextSignal) => subregistersApi.list(entry.id, params, nextSignal), {}, signal),
+    staleTime: 15_000, retry: false,
+  })) });
+  const managedIndex = owned.findIndex(entry => entry.id === managed?.id);
+  const managedSubs = subQueries[managedIndex]?.data ?? [];
+  const subregister = managedSubs.find(entry => entry.id === subregisterId) ?? managedSubs[0];
+  const invitedScope = invitations.find(entry => entry.registerId === registerId && entry.id === subregisterId);
+  const memberQuery = useApiQuery(userId, 'members', subregister?.id,
+    signal => allPages((params, nextSignal) => sharingApi.members(managed.id, subregister.id, params, nextSignal), {}, signal),
+    Boolean(subregister && section === 'subregisters'));
+  const scopeAssets = useApiQuery(userId, 'scope-assets', managed?.id,
+    signal => allPages((params, nextSignal) => assetsApi.list(managed.id, params, nextSignal), { includeArchived: true }, signal),
+    Boolean(managed && dialog?.type === 'scope'));
+  const incomingQuery = useApiQuery(userId, 'requests', { view: 'incoming' }, signal => allPages(requestsApi.list, { view: 'incoming' }, signal));
+  const submittedQuery = useApiQuery(userId, 'requests', { view: 'submitted' }, signal => allPages(requestsApi.list, { view: 'submitted' }, signal));
   const scopes = [
-    ...owned.flatMap(entry => [
-      { register: entry, path: entry.id, label: entry.name },
-      ...entry.subregisters.map(sub => ({ register: entry, subregister: sub, path: `${entry.id}/${sub.id}`, label: `${entry.name} / ${sub.name}` })),
+    ...owned.flatMap((entry, index) => [
+      { registerId: entry.id, label: entry.name, path: entry.id },
+      ...(subQueries[index]?.data ?? []).map(sub => ({ registerId: entry.id, subregisterId: sub.id, label: `${entry.name} / ${sub.name}`, path: `${entry.id}/${sub.id}` })),
     ]),
-    ...invitations.map(entry => ({
-      ...entry,
-      path: `${entry.register.id}/${entry.subregister.id}`,
-      label: `${entry.register.name} / ${entry.subregister.name} · ${roleLabels[entry.role]}`,
-    })),
+    ...invitations.map(sub => ({ registerId: sub.registerId, subregisterId: sub.id, label: `${sub.registerName} / ${sub.name} · ${roleLabels[sub.role]}`, path: `${sub.registerId}/${sub.id}` })),
   ];
   const historyScope = scopes.find(entry => entry.path === [registerId, subregisterId].filter(Boolean).join('/')) ?? scopes[0];
-  const pendingCount = incoming.filter(({ request }) => request.status === 'pending').length;
+  const historyQuery = useApiQuery(userId, 'history', historyScope?.path,
+    signal => allPages((params, nextSignal) => historyApi.list(historyScope.registerId, params, nextSignal), { subregisterId: historyScope.subregisterId }, signal),
+    Boolean(historyScope && section === 'history'));
+  const detail = ['details', 'editAsset'].includes(dialog?.type) ? dialog : null;
+  const detailsQuery = useApiQuery(userId, 'asset-detail', { registerId: detail?.registerId, subregisterId: detail?.subregisterId, assetId: detail?.assetId },
+    signal => assetsApi.get(detail.registerId, detail.assetId, { subregisterId: detail.subregisterId }, signal), Boolean(detail));
 
   useEffect(() => {
-    function updateRoute() {
-      setRoute(readRoute());
-      setDialog(null);
-      window.scrollTo(0, 0);
-    }
-    function syncRegisters(event) {
-      if (event.key === storageKey || event.key === null) setData(readInitialState());
-    }
+    function updateRoute() { setRoute(readRoute()); setDialog(null); setActionError(''); window.scrollTo(0, 0); }
     window.addEventListener('hashchange', updateRoute);
-    window.addEventListener('storage', syncRegisters);
-    return () => {
-      window.removeEventListener('hashchange', updateRoute);
-      window.removeEventListener('storage', syncRegisters);
-    };
+    return () => window.removeEventListener('hashchange', updateRoute);
   }, []);
 
-  function switchProfile(next) {
-    setProfileId(next);
-    setDialog(null);
-    setNotice('');
-    navigateTo(section === 'register' ? '' : section);
+  useEffect(() => {
+    configureSessionExpired(() => { void clearPrivateCache().then(() => setSessionKey(crypto.randomUUID())); });
+    return () => configureSessionExpired(() => {});
+  }, []);
+
+  async function login(values) {
+    const session = await authApi.login(values);
+    await clearPrivateCache();
+    const nextKey = crypto.randomUUID();
+    queryClient.setQueryData(['auth', nextKey], session);
+    setSessionKey(nextKey);
+    setDialog(null); setNotice(''); setActionError('');
+  }
+  async function logout() {
     try {
-      sessionStorage.setItem('invory.demo.profile', next);
-    } catch {
-      // The active profile remains available in the current view.
-    }
+      await authApi.logout();
+      await clearPrivateCache();
+      setSessionKey(crypto.randomUUID());
+      setDialog(null); setNotice(''); setActionError('');
+      navigateTo('');
+    } catch (error) { setActionError(error.message); }
   }
 
-  function finish(registers, message) {
-    setData({ registers, error: '' });
-    setDialog(null);
-    setNotice(message);
+  async function switchProfile(next) {
+    try {
+      const profile = demo.users.find(user => user.id === next);
+      const session = await authApi.login({ email: profile.email, password: 'demo' });
+      await clearPrivateCache();
+      const nextKey = crypto.randomUUID();
+      queryClient.setQueryData(['auth', nextKey], session);
+      setSessionKey(nextKey);
+      setDialog(null); setNotice(''); setActionError('');
+      if (section !== 'accept') navigateTo(section === 'register' ? '' : section);
+    } catch (error) { setActionError(error.message); }
   }
-
+  async function resetData() {
+    demo.reset(); await clearPrivateCache(); setSessionKey(crypto.randomUUID());
+    setDialog(null); setNotice('Демо данните са нулирани.'); setActionError(''); navigateTo('');
+  }
+  function refreshed(message) {
+    queryClient.invalidateQueries({ queryKey: ['user', userId] });
+    setDialog(null); setNotice(message); setActionError('');
+  }
+  async function action(callback, message) {
+    setActionError('');
+    try { const result = await callback(); refreshed(message); return result; }
+    catch (error) { setActionError(error.message); throw error; }
+  }
+  async function accept(token) {
+    setAccepting(true); setActionError('');
+    try { const scope = await sharingApi.accept(token); refreshed('Поканата е приета.'); navigateTo(`invited/${scope.registerId}/${scope.id}`); }
+    catch (error) { setActionError(error.message); }
+    finally { setAccepting(false); }
+  }
   async function saveRegister(values) {
-    const result = await createRegister(values, profileId);
-    finish(result.registers, 'Регистърът е създаден.');
-    navigateTo(registerHref(result.register.id));
+    const saved = await action(() => registersApi.create({ name: values.name, description: values.description }), 'Регистърът е създаден.');
+    navigateTo(registerHref(saved.id));
   }
-
+  async function updateRegister(values) {
+    await action(() => registersApi.update(register.id, { name: values.name, description: values.description }), 'Регистърът е обновен.');
+  }
+  async function saveAsset(values, existing) {
+    const body = { ...values, quantity: Number(values.quantity), acquiredOn: values.acquiredOn || null };
+    delete body.assetIds;
+    if (existing) await action(() => assetsApi.update(register.id, existing.id, { ...body, expectedVersion: existing.version }), 'Активът е обновен.');
+    else await action(() => assetsApi.create(register.id, body), 'Активът е добавен в регистъра.');
+  }
   async function saveSubregister(values) {
-    const registers = await createSubregister(managed.id, profileId, values);
-    const saved = registers.find(entry => entry.id === managed.id).subregisters.at(-1);
-    finish(registers, 'Подрегистърът е създаден.');
+    const saved = await action(() => subregistersApi.create(managed.id, { name: values.name }), 'Подрегистърът е създаден.');
     navigateTo(`subregisters/${managed.id}/${saved.id}`);
   }
-
-  function openDialog(type, options = {}) {
-    setNotice('');
-    setDialog({ type, ...options });
+  async function renameSubregister(values) {
+    await action(() => subregistersApi.update(managed.id, subregister.id, { name: values.name, expectedVersion: subregister.version }), 'Подрегистърът е преименуван.');
   }
-
-  const close = () => setDialog(null);
-  const openAsset = asset => openDialog('details', { asset });
+  async function saveScope(values) {
+    await action(() => subregistersApi.update(managed.id, subregister.id, { assetIds: values.assetIds, expectedVersion: subregister.version }), 'Обхватът на подрегистъра е запазен.');
+  }
+  async function observe(values) {
+    const body = { subregisterId: invitedScope.id, assetId: dialog.asset.id, assetVersion: dialog.asset.version, kind: values.kind, note: values.note ?? '', location: values.location ?? '' };
+    await action(() => requestsApi.create(invitedScope.registerId, body), values.kind === 'present' ? 'Проверката е записана в историята.' : 'Заявката е изпратена до администратора.');
+  }
+  async function updateMember(id, role) {
+    try { await action(() => sharingApi.updateMember(managed.id, subregister.id, id, { role }), 'Ролята е обновена.'); } catch { /* The current view shows the error. */ }
+  }
+  async function removeMember(id) {
+    try { await action(() => sharingApi.removeMember(managed.id, subregister.id, id), 'Достъпът е премахнат.'); } catch { /* The current view shows the error. */ }
+  }
+  const pendingCount = (incomingQuery.data ?? []).filter(request => request.status === 'pending').length;
+  const loading = userId && (ownedQuery.isPending || invitedQuery.isPending);
+  const globalError = me.error || ownedQuery.error || invitedQuery.error || subQueries.find(query => query.error)?.error || incomingQuery.error || submittedQuery.error;
 
   function renderView() {
-    switch (section) {
-      case 'subregisters':
-        return <SubregistersView owned={owned} register={managed} subregister={subregister}
-          onCreate={() => openDialog('subregister')} onScope={() => openDialog('scope', { originalIds: subregister.assetIds })}
-          onInvite={() => openDialog('invite')} />;
-      case 'invited': {
-        if (!invitation) return <InvitedList invitations={invitations} />;
-        const { register: source, subregister: shared, role } = invitation;
-        const assets = source.assets.filter(asset => shared.assetIds.includes(asset.id));
-        return <RegisterView key={shared.id}
-          register={{ name: shared.name, description: `Подрегистър към „${source.name}“`, assets }}
-          kicker={roleLabels[role]} onOpen={openAsset}
-          extraActions={<ActionLink href={`#history/${source.id}/${shared.id}`}>История</ActionLink>}
-          assetActions={role === 'participant' ? asset => (
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="secondary" onClick={() => openDialog('observation', { asset })}>Свери</Button>
-              <Button type="button" variant="secondary" onClick={() => openDialog('observation', { asset, disposal: true })}>Предложи бракуване</Button>
-            </div>
-          ) : undefined} />;
-      }
-      case 'requests':
-        return <RequestsView incoming={incoming} submitted={submitted}
-          onDecide={(id, request, decision) => openDialog('decision', { id, request, decision })} />;
-      case 'history':
-        return <HistoryView scopes={scopes} selected={historyScope}
-          events={historyScope ? visibleHistory(historyScope.register, historyScope.subregister, profileId) : []} />;
-      default:
-        if (register) {
-          return <RegisterView key={register.id} register={register} onAdd={() => openDialog('asset')} onOpen={openAsset}
-            extraActions={<ActionLink href={`#subregisters/${register.id}`}>Подрегистри</ActionLink>} />;
-        }
-        if (registerId) {
-          return <div className="min-w-0 rounded-2xl border border-[#dcdde3] dark:border-[#3b3d46] bg-white dark:bg-[#232429] p-5 sm:p-6 shadow-[0_2px_8px_rgb(24_32_48/0.03)] dark:shadow-none space-y-4">
-            <h1 className="text-2xl font-semibold">Регистърът не е достъпен за този профил</h1>
-            <ActionLink href="#">Към работните регистри</ActionLink>
-          </div>;
-        }
-        return <RegisterList registers={owned} onCreate={() => openDialog('register')} registerHref={registerHref} />;
+    if (section === 'accept') return <AcceptInvitation token={registerId} onAccept={accept} pending={accepting} error={actionError} />;
+    if (loading) return <p role="status">Зареждане…</p>;
+    if (globalError) return <p role="alert">{globalError.message}</p>;
+    if ((section === 'subregisters' || section === 'history') && subQueries.some(query => query.isPending)) return <p role="status">Зареждане на подрегистри…</p>;
+    if (section === 'subregisters' && memberQuery.isPending && subregister) return <p role="status">Зареждане на участници…</p>;
+    if (section === 'subregisters') return <SubregistersView owned={owned} register={managed ? { ...managed, subregisters: managedSubs } : null}
+      subregister={subregister} members={memberQuery.data ?? []} onCreate={() => setDialog({ type: 'subregister' })}
+      onRename={() => setDialog({ type: 'editSubregister' })} onScope={() => setDialog({ type: 'scope' })} onInvite={() => setDialog({ type: 'invite' })}
+      onMemberRole={updateMember} onRemoveMember={removeMember} />;
+    if (section === 'invited') {
+      if (!invitedScope) return <InvitedList invitations={invitations} />;
+      return <RegisterView key={invitedScope.id} userId={userId} registerId={invitedScope.registerId} subregisterId={invitedScope.id}
+        register={{ name: invitedScope.name, description: `Подрегистър към „${invitedScope.registerName}“`, assetCount: invitedScope.assetIds.length }}
+        kicker={roleLabels[invitedScope.role]}
+        onOpen={asset => setDialog({ type: 'details', registerId: invitedScope.registerId, subregisterId: invitedScope.id, assetId: asset.id })}
+        extraActions={<ActionLink href={`#history/${invitedScope.registerId}/${invitedScope.id}`}>История</ActionLink>}
+        assetActions={invitedScope.permissions.includes('check') ? asset => <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="secondary" onClick={() => setDialog({ type: 'observation', asset })}>Свери</Button>
+          <Button type="button" variant="secondary" onClick={() => setDialog({ type: 'observation', asset, disposal: true })}>Предложи бракуване</Button>
+        </div> : undefined} />;
     }
+    if (section === 'requests' && (incomingQuery.isPending || submittedQuery.isPending)) return <p role="status">Зареждане на заявки…</p>;
+    if (section === 'requests') return <RequestsView incoming={incomingQuery.data ?? []} submitted={submittedQuery.data ?? []}
+      onDecide={(request, status) => setDialog({ type: 'decision', request, status })} />;
+    if (section === 'history') return <HistoryView scopes={scopes} selected={historyScope} events={historyQuery.data ?? []} loading={historyQuery.isPending} error={historyQuery.error} />;
+    if (register) return <RegisterView key={register.id} userId={userId} registerId={register.id} register={register}
+      onAdd={() => setDialog({ type: 'asset' })}
+      onOpen={asset => setDialog({ type: 'details', registerId: register.id, assetId: asset.id, canManage: true })}
+      extraActions={<><ActionLink href={`#subregisters/${register.id}`}>Подрегистри</ActionLink><Button type="button" variant="secondary" onClick={() => setDialog({ type: 'editRegister' })}>Редактирай регистъра</Button></>} />;
+    if (registerId) return <div className="rounded-2xl border border-[#dcdde3] bg-white p-6 dark:border-[#3b3d46] dark:bg-[#232429]">
+      <h1 className="text-2xl font-semibold">Регистърът не е достъпен за този профил</h1><ActionLink href="#">Към работните регистри</ActionLink></div>;
+    return <RegisterList registers={owned} onCreate={() => setDialog({ type: 'register' })} registerHref={registerHref} />;
   }
 
-  return (
-    <>
-      <AppShell section={section} pendingCount={pendingCount} profileId={profileId}
-        onSwitchProfile={switchProfile} onNavigate={() => setNotice('')} onCreate={() => openDialog('register')}
-        error={data.error} notice={notice}>
-        {renderView()}
-      </AppShell>
+  if (me.isPending) return <main role="status" className="grid min-h-dvh place-items-center">Зареждане на профила…</main>;
+  if (me.error) return <LoginPage demoUsers={demo?.users} onLogin={login} initialError={me.error} />;
 
-      {dialog?.type === 'register' && <RegisterDialog onClose={close} onSave={saveRegister} />}
-      {dialog?.type === 'asset' && register && <AssetDialog registerName={register.name} onClose={close}
-        onSave={async values => finish(await addAsset(register.id, values, profileId), 'Активът е добавен в регистъра.')} />}
-      {detailsAsset && <AssetDetails asset={detailsAsset} onClose={close} />}
-      {dialog?.type === 'subregister' && managed && <SubregisterDialog onClose={close} onSave={saveSubregister} />}
-      {dialog?.type === 'scope' && subregister && <ScopeDialog register={managed} subregister={subregister} onClose={close}
-        onSave={async values => finish(await assignAssets(managed.id, subregister.id, profileId, values.assetIds, dialog.originalIds), 'Обхватът на подрегистъра е запазен.')} />}
-      {dialog?.type === 'invite' && subregister && <InviteDialog profileId={profileId} subregister={subregister} onClose={close}
-        onSave={async values => finish(await inviteProfile(managed.id, subregister.id, profileId, values), 'Достъпът е запазен.')} />}
-      {dialog?.type === 'observation' && invitation?.role === 'participant' && <ObservationDialog asset={dialog.asset} disposal={dialog.disposal} onClose={close}
-        onSave={async values => finish(
-          await submitObservation(invitation.register.id, invitation.subregister.id, dialog.asset.id, profileId, values, dialog.asset),
-          values.kind === 'present' ? 'Проверката е записана в историята.' : 'Заявката е изпратена до администратора.',
-        )} />}
-      {dialog?.type === 'decision' && <DecisionDialog approve={dialog.decision === 'approved'} description={requestLabels[dialog.request.kind]} onClose={close}
-        onSave={async values => finish(
-          await decideRequest(dialog.id, dialog.request.id, profileId, dialog.decision, values.reason),
-          'Решението е записано.',
-        )} />}
-    </>
-  );
+  return <>
+    <AppShell section={section} pendingCount={pendingCount} profileId={demo ? demo.currentUserId() : me.data?.user.name} demoUsers={demo?.users}
+      onSwitchProfile={switchProfile} onReset={resetData} onLogout={logout} onNavigate={() => setNotice('')} onCreate={() => setDialog({ type: 'register' })}
+      error={actionError || (globalError && !loading ? globalError.message : '')} notice={notice}>{renderView()}</AppShell>
+    {dialog?.type === 'register' && <RegisterDialog onClose={() => setDialog(null)} onSave={saveRegister} />}
+    {dialog?.type === 'editRegister' && register && <RegisterDialog register={register} onClose={() => setDialog(null)} onSave={updateRegister} />}
+    {dialog?.type === 'asset' && register && <AssetDialog registerName={register.name} onClose={() => setDialog(null)} onSave={values => saveAsset(values)} />}
+    {dialog?.type === 'editAsset' && register && detailsQuery.data && <AssetDialog registerName={register.name} asset={detailsQuery.data} onClose={() => setDialog(null)} onSave={values => saveAsset(values, detailsQuery.data)} />}
+    {dialog?.type === 'details' && detailsQuery.data && <AssetDetails asset={detailsQuery.data} onClose={() => setDialog(null)}
+      onEdit={detail.canManage ? () => setDialog({ ...detail, type: 'editAsset' }) : undefined}
+      onArchive={detail.canManage ? async () => { try { await action(() => assetsApi.archive(detail.registerId, detail.assetId), 'Активът е архивиран.'); } catch { /* The current view shows the error. */ } } : undefined} />}
+    {dialog?.type === 'subregister' && managed && <SubregisterDialog onClose={() => setDialog(null)} onSave={saveSubregister} />}
+    {dialog?.type === 'editSubregister' && subregister && <SubregisterDialog subregister={subregister} onClose={() => setDialog(null)} onSave={renameSubregister} />}
+    {dialog?.type === 'scope' && subregister && scopeAssets.isPending && <div role="status">Зареждане на активи…</div>}
+    {dialog?.type === 'scope' && subregister && scopeAssets.error && <p role="alert">{scopeAssets.error.message}</p>}
+    {dialog?.type === 'scope' && subregister && scopeAssets.data && <ScopeDialog assets={scopeAssets.data} subregister={subregister} onClose={() => setDialog(null)} onSave={saveScope} />}
+    {dialog?.type === 'invite' && subregister && <InviteDialog userId={userId} registerId={managed.id} subregister={subregister} onClose={() => setDialog(null)} onChanged={() => queryClient.invalidateQueries({ queryKey: ['user', userId] })} />}
+    {dialog?.type === 'observation' && invitedScope?.role === 'participant' && <ObservationDialog asset={dialog.asset} disposal={dialog.disposal} onClose={() => setDialog(null)} onSave={observe} />}
+    {dialog?.type === 'decision' && <DecisionDialog approve={dialog.status === 'approved'} description={requestLabels[dialog.request.kind]} onClose={() => setDialog(null)}
+      onSave={values => action(() => requestsApi.decide(dialog.request.id, { status: dialog.status, reason: values.reason ?? '' }), 'Решението е записано.')} />}
+  </>;
 }

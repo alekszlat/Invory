@@ -1,7 +1,7 @@
 import { ArrowRight, Box } from 'lucide-react';
 
 export default function RegisterCard({ register, href }) {
-  const count = register.assets.length;
+  const count = register.assetCount;
 
   return (
     <li className="flex min-w-0 flex-col rounded-2xl border border-[#dcdde3] dark:border-[#3b3d46] bg-white dark:bg-[#232429] p-6 shadow-[0_2px_8px_rgb(24_32_48/0.03)] dark:shadow-none">

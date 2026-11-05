@@ -1,7 +1,6 @@
 import { Select } from '../shared/ui/FormControls.jsx';
 import Button from '../shared/ui/Button.jsx';
 import { Box, Plus, UserRound } from 'lucide-react';
-import { profiles } from '../registryStore.js';
 import { navigation } from './navigation.js';
 
 function Sidebar({ section, pendingCount, onNavigate, onCreate }) {
@@ -33,7 +32,7 @@ function Sidebar({ section, pendingCount, onNavigate, onCreate }) {
 }
 
 export default function AppShell({
-  section, pendingCount, profileId, onSwitchProfile, onNavigate, onCreate, error, notice, children,
+  section, pendingCount, profileId, demoUsers, onSwitchProfile, onReset, onLogout, onNavigate, onCreate, error, notice, children,
 }) {
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[240px_minmax(0,1fr)]">
@@ -44,13 +43,17 @@ export default function AppShell({
       <Sidebar section={section} pendingCount={pendingCount} onNavigate={onNavigate} onCreate={onCreate} />
       <div className="min-w-0">
         <header className="flex min-h-20 flex-wrap items-center justify-between gap-3 border-b border-[#dcdde3] dark:border-[#3b3d46] bg-white dark:bg-[#232429] px-5 py-3 lg:px-10">
-          <p className="text-sm font-medium text-[#62646c] dark:text-[#b0b2be]">{navigation.find(page => page.id === section).label}</p>
+          <p className="text-sm font-medium text-[#62646c] dark:text-[#b0b2be]">{navigation.find(page => page.id === section)?.label ?? 'Покана'}</p>
           <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2.5 [&>svg]:text-[#62646c] dark:[&>svg]:text-[#b0b2be]">
             <UserRound size={17} strokeWidth={1.7} aria-hidden="true" />
-            <label htmlFor="demo-profile" className="text-xs font-medium text-[#62646c] dark:text-[#b0b2be]">Демо профил</label>
-            <Select id="demo-profile" fullWidth={false} className="max-w-full max-[479px]:flex-1" value={profileId} onChange={event => onSwitchProfile(event.target.value)}>
-              {profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
-            </Select>
+            {demoUsers?.length ? <>
+              <label htmlFor="demo-profile" className="text-xs font-medium text-[#62646c] dark:text-[#b0b2be]">Демо профил</label>
+              <Select id="demo-profile" fullWidth={false} className="max-w-full max-[479px]:flex-1" value={profileId} onChange={event => onSwitchProfile(event.target.value)}>
+                {demoUsers.map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
+              </Select>
+              <Button type="button" variant="secondary" onClick={onReset}>Нулирай демо данните</Button>
+            </> : <span className="text-sm">{profileId || 'Профил'}</span>}
+            <Button type="button" variant="secondary" onClick={onLogout}>Изход</Button>
           </div>
         </header>
         <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-7xl px-5 py-7 lg:px-10 lg:py-10">

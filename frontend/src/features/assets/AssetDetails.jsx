@@ -3,7 +3,7 @@ import Dialog from '../../shared/ui/Dialog.jsx';
 const dateFormat = new Intl.DateTimeFormat('bg-BG', { dateStyle: 'medium', timeZone: 'UTC' });
 const quantityFormat = new Intl.NumberFormat('bg-BG');
 
-export default function AssetDetails({ asset, onClose }) {
+export default function AssetDetails({ asset, onClose, onEdit, onArchive }) {
   const details = [
     ['Инвентарен номер', asset.inventoryNumber],
     ['Местоположение', asset.location],
@@ -24,6 +24,10 @@ export default function AssetDetails({ asset, onClose }) {
           </div>
         ))}
       </dl>
+      {(onEdit || onArchive) && <div className="flex justify-end gap-2 border-t border-[#dcdde3] p-5 dark:border-[#3b3d46]">
+        {onEdit && <button type="button" onClick={onEdit} className="text-sm font-semibold text-[#005ac1] dark:text-[#9bcaff]">Редактирай</button>}
+        {onArchive && <button type="button" onClick={onArchive} className="text-sm font-semibold text-[#b32830] dark:text-[#ffb1b8]">Архивирай</button>}
+      </div>}
     </Dialog>
   );
 }
