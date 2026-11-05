@@ -20,7 +20,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 
 string connectionString = builder.Configuration.GetSection("ConnectionStrings")["DefaultConnection"];
-
+/*
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ReactAppPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000") // примерен фрон енд на който даваме достъп
+              .AllowAnyHeader()                     // Разрешаваме всякакви хедъри (напр. Authorization)
+              .AllowAnyMethod();                    // Разрешаваме GET, POST, PUT, DELETE и т.н.
+    });
+});
+*/
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly, includeInternalTypes: true);
 
 builder.Services.AddTransient<IEmailSender, EmailSender>();
@@ -56,8 +66,13 @@ builder.Services.AddOpenApi(options =>
 });
 
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+builder.Services.AddAuthentication(
+
+    //може да се сложи тук автоматично да искаме токени
+
+).AddJwtBearer(options =>
 {
+
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -77,6 +92,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 builder.Services.AddAuthorization(); 
 var app = builder.Build();
 
+
+//app.UseCors("ReactAppPolicy");
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

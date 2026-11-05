@@ -1,4 +1,4 @@
-﻿using Invory.Models.HelperClasses;
+﻿using Invory.Models.enums;
 
 namespace Invory.Models.BDModels
 {
@@ -11,6 +11,6 @@ namespace Invory.Models.BDModels
         public WorkSpace Workspace { get; set; }
 
 
-        public WorkspaceRole Role { get; set; }
+        public WorkspaceRole workspaceRole { get; set; }
     }
 }

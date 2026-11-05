@@ -1,4 +1,4 @@
-﻿namespace Invory.Models.HelperClasses
+﻿namespace Invory.Models.enums
 {
     public enum WorkspaceRole
     {

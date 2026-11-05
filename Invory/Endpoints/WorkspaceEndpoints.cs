@@ -1,6 +1,7 @@
 ﻿using Invory.Db;
 using Invory.DTO;
 using Invory.Models.BDModels;
+using Invory.Models.enums;
 using Invory.Models.HelperClasses;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
@@ -43,7 +44,7 @@ namespace Invory.Endpoints
 
                 newConenction.UserId = userId;
                 
-                newConenction.Role = WorkspaceRole.Admin;
+                newConenction.workspaceRole = WorkspaceRole.Admin;
 
                 await context.WorkspaceRoleUserTables.AddAsync(newConenction);
                 await context.SaveChangesAsync();
@@ -84,10 +85,12 @@ namespace Invory.Endpoints
 
 
 
-
             })
             .RequireAuthorization();
 
+
+
+            
 
 
         }

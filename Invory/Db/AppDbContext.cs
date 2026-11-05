@@ -1,4 +1,5 @@
 ﻿using Invory.Models.BDModels;
+using Invory.Models.HelperClasses;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +14,7 @@ namespace Invory.Db
         public DbSet<SubWorkSpace> SubWorkSpaces { get; set; }
         public DbSet<Asset> Assets { get; set; }
         public DbSet<WorkspaceRoleUserTable> WorkspaceRoleUserTables { get; set; }
-
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
 
@@ -21,6 +22,8 @@ namespace Invory.Db
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
             base.OnModelCreating(modelBuilder);
 
             modelBuilder.Entity<User>().ToTable("User");
@@ -34,14 +37,27 @@ namespace Invory.Db
             .WithMany(Users => Users.Workspaces)
             .UsingEntity<WorkspaceRoleUserTable>();
 
+
+
+
+
+            modelBuilder.Entity<SubWorkspaceRoleUserTable>().HasKey(wu => new { wu.UserId, wu.SubWorkSpaceId });
+
+            modelBuilder.Entity<SubWorkSpace>()
+           .HasMany(SubWorkSpace => SubWorkSpace.Users)
+           .WithMany(Users => Users.SubWorkSpaces)
+           .UsingEntity<SubWorkspaceRoleUserTable>();
+
+
+
             // Конвертиране на Enum ролята към текст в базата данни 
             modelBuilder.Entity<WorkspaceRoleUserTable>()
-                .Property(wu => wu.Role)
+                .Property(wu => wu.workspaceRole)
                 .HasConversion<string>();
 
             modelBuilder.Entity<Asset>()
-          .Property(asset => asset.status)
-          .HasConversion<string>();
+           .Property(asset => asset.status)
+           .HasConversion<string>();
 
             modelBuilder.Entity<User>(entity =>
             {
@@ -50,7 +66,7 @@ namespace Invory.Db
                 entity.HasCheckConstraint("CK_User_UserName_MinLength", "LEN(UserName) >= 6");
             });
 
-
+            
         }
     }
 }

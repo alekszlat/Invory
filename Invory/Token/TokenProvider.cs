@@ -1,14 +1,17 @@
 ﻿namespace Invory.Token
 {
-    using Microsoft.AspNetCore.Identity;
-    using Microsoft.IdentityModel.Tokens;
-    using System.IdentityModel.Tokens.Jwt;
-    using System.Security.Claims;
-    using System.Text;
-    using Microsoft.Extensions.Options;
+    using Invory.Db;
     using Invory.DTO;
     using Invory.Models.BDModels;
     using Invory.Models.HelperClasses;
+    using Microsoft.AspNetCore.Identity;
+    using Microsoft.EntityFrameworkCore;
+    using Microsoft.Extensions.Options;
+    using Microsoft.IdentityModel.Tokens;
+    using System.IdentityModel.Tokens.Jwt;
+    using System.Security.Claims;
+    using System.Security.Cryptography;
+    using System.Text;
 
     public class TokenProvider
     {
@@ -59,6 +62,47 @@
         }
 
 
+
+        public static string GenerateRefreshToken()
+        {
+            return Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        }
+
+
+        public static async Task<string> CreateAndStoreRefreshTokenAsync(
+    AppDbContext dbContext,
+    HttpContext httpContext,
+    int userId,
+    int expirationDays)
+        {
+            //Почистваме изтеклите токени за този потребител 
+            await dbContext.RefreshTokens.Where(rt => rt.UserId == userId && rt.ExpireTime <= DateTime.UtcNow).ExecuteDeleteAsync();
+
+            // Генерираме нов суров рефреш токен
+            var rawRefreshToken = GenerateRefreshToken();
+            var expireTime = DateTime.UtcNow.AddDays(expirationDays);
+
+            var refToken = new RefreshToken
+            {
+                UserId = userId,
+                Token = rawRefreshToken,
+                ExpireTime = expireTime
+            };
+
+            dbContext.RefreshTokens.Add(refToken);
+            await dbContext.SaveChangesAsync();
+
+            // 3. Записваме го в HttpOnly бисквитка
+            httpContext.Response.Cookies.Append("invory_refresh", rawRefreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = false, // В production задължително true (заради HTTPS)
+                SameSite = SameSiteMode.Strict,
+                Expires = expireTime
+            });
+
+            return rawRefreshToken;
+        }
 
     }
 }

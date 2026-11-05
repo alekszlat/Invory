@@ -1,6 +1,7 @@
 ﻿using Invory.Db;
 using Invory.DTO;
 using Invory.Models.BDModels;
+using Invory.Models.HelperClasses;
 using Invory.Models.Interfaces;
 using Invory.Token;
 using Invory.Validators;
@@ -8,7 +9,10 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using System.Security.Claims;
 using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace Invory.Endpoints
 {
@@ -17,17 +21,22 @@ namespace Invory.Endpoints
 
         public static void MapAuthenticationEndpoints(this IEndpointRouteBuilder app)
         {
-            app.MapPost("/login", async Task<Results<BadRequest<string>, Ok<TokenExpDate>>> (LoginRequestDto loginRequestDto, AppDbContext dbContext, TokenProvider tokenProvider, UserManager<User> userManager) =>
+
+            var authGroup = app.MapGroup("/api/v1/auth");
+
+
+            authGroup.MapPost("/login", async Task<Results<BadRequest<string>, Ok<TokenExpDate>>> (
+     HttpContext httpContext,
+     LoginRequestDto loginRequestDto,
+     AppDbContext dbContext,
+     TokenProvider tokenProvider,
+     UserManager<User> userManager,
+     IOptions<JwtSettings> options) =>
             {
                 var user = await userManager.FindByEmailAsync(loginRequestDto.gmail);
-                if (user == null)
+                if (user == null || !user.EmailConfirmed)
                 {
-                    return TypedResults.BadRequest("Username or password is not correct");
-                }
-
-                if (!user.EmailConfirmed)
-                {
-                    return TypedResults.BadRequest("User has not confirmed email");
+                    return TypedResults.BadRequest("Username or password is not correct, or email not confirmed");
                 }
 
                 bool isPasswordValid = await userManager.CheckPasswordAsync(user, loginRequestDto.password);
@@ -36,15 +45,26 @@ namespace Invory.Endpoints
                     return TypedResults.BadRequest("Username or password is not correct");
                 }
 
+                // 1. Създаваме краткотраен Access Token
                 TokenExpDate tokenAndExpTime = tokenProvider.CreateUserToken(user);
 
-                return TypedResults.Ok(tokenAndExpTime);
+                // 2. Извикваме общата функция за генериране и запис на рефреш токена + бисквитката
+                await TokenProvider.CreateAndStoreRefreshTokenAsync(
+                    dbContext,
+                    httpContext,
+                    user.Id,
+                    options.Value.RefreshTokenExpirationDays
+                );
 
+                return TypedResults.Ok(tokenAndExpTime);
             });
 
 
 
-            app.MapPost("/register", async Task<Results<BadRequest<IDictionary<string, string[]>>, BadRequest<string>, BadRequest<IEnumerable<IdentityError>>, BadRequest, Ok<string>>>
+
+
+
+            authGroup.MapPost("/register", async Task<Results<BadRequest<IDictionary<string, string[]>>, BadRequest<string>, BadRequest<IEnumerable<IdentityError>>, BadRequest, Ok<string>>>
                 (AppDbContext dbContext, RegisterRequestDto registerRequestDto
                 , RequestRegisterDtoValidator registerRequestValidator, UserManager<User> userManager, IEmailSender emailSender) =>
             {
@@ -81,18 +101,17 @@ namespace Invory.Endpoints
 
                 await emailSender.SendEmail(user.Email, "Invory Email confirmation", "Finish invory regestration: " + confirmationLink);
 
+
                 return TypedResults.Ok("Account created, email verification needed!");
 
             }
 
-          ).WithDescription("If registration is susscesfull returns message:- Registration successful! otherwise :- Bad Request");
+          ).WithDescription("If registration is susscesfull returns message:- Registration successful email verification needed, otherwise :- Bad Request");
 
            
 
 
-            
-
-       
+    
             app.MapGet("/confirm-email", async Task<Results<BadRequest<string>, Ok<string>>> (int userId, string token, UserManager<User> userManager) =>
             {
                 if (userId <= 0 || string.IsNullOrEmpty(token))
@@ -130,8 +149,100 @@ namespace Invory.Endpoints
             .WithDescription("Confirms user's email using token and userId.");
 
 
+            authGroup.MapPost("/logout", async (HttpContext httpContext, AppDbContext dbContext, ClaimsPrincipal user) =>
+            {
+
+                var userIdString = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (int.TryParse(userIdString, out int userId))
+                {
+                    // Изтриваме всички рефреш токени на този потребител от базата
+                    await dbContext.RefreshTokens
+                        .Where(rt => rt.UserId == userId)
+                        .ExecuteDeleteAsync();
+                   
+                }
+
+                // Изчистваме бисквитката от браузъра
+                httpContext.Response.Cookies.Delete("invory_refresh");
+
+                // Връщаме 204 No Content според спецификацията
+                return TypedResults.NoContent();
+            }).RequireAuthorization(policy => policy
+    .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
+    .RequireAuthenticatedUser()).WithDescription("Who is the user");
 
 
+
+
+            authGroup.MapPost("/refresh", async Task<Results<BadRequest<string>, Ok<TokenExpDate>>> (
+       HttpContext httpContext,
+       AppDbContext dbContext,
+       TokenProvider tokenProvider,
+       IOptions<JwtSettings> options) =>
+            {
+        /*Целта на функцията е да провери дали рефреш токена е още валиден
+         *като го взима от бисквитката
+         *Първо проверява дали е изтекъл, изтича, когато потребител не се логне дълго време
+         *Ако не е изтекал го изтриваме, за да го заменим с новия 
+         *Възможно е да има проблем с потребителя
+         *Създаваме нов рефреш токен чрез функцията
+       */
+
+
+
+                //пробва да извади рефреш токена от бисквитката 
+                if (!httpContext.Request.Cookies.TryGetValue("invory_refresh", out var oldRefreshTokenValue))
+                {
+                    return TypedResults.BadRequest("Refresh token is missing.");
+                }
+
+                // 2. Намираме го в базата и зареждаме потребителя му
+                var existingToken = await dbContext.RefreshTokens
+                    .Include(rt => rt.User)
+                    .FirstOrDefaultAsync(rt => rt.Token == oldRefreshTokenValue);
+
+                if (existingToken == null || existingToken.ExpireTime < DateTime.UtcNow)
+                {
+                    return TypedResults.BadRequest("Invalid or expired refresh token.");
+                }
+
+                
+                dbContext.RefreshTokens.Remove(existingToken);
+
+                var user = existingToken.User;
+                if (user == null || !user.EmailConfirmed)
+                {
+                    return TypedResults.BadRequest("User not found or unconfirmed.");
+                }
+              
+                TokenExpDate newAccessTokenDto = tokenProvider.CreateUserToken(user);
+
+                await TokenProvider.CreateAndStoreRefreshTokenAsync(
+                    dbContext,
+                    httpContext,
+                    user.Id,
+                    options.Value.RefreshTokenExpirationDays
+                );
+
+                // 6. Връщаме новия Access Token към фронтенда
+                return TypedResults.Ok(newAccessTokenDto);
+            });
+
+
+            authGroup.MapGet("/me", async Task<Results<NotFound,Ok<UserDto>>>(ClaimsPrincipal user, UserManager<User> userManager) =>
+            {
+                var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+                var currentUser = await userManager.FindByIdAsync(userId);
+
+                if (currentUser == null) return TypedResults.NotFound();
+
+                return TypedResults.Ok(new UserDto(currentUser.Id,currentUser.UserName,currentUser.Email));
+            })
+            .RequireAuthorization(policy => policy
+    .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
+    .RequireAuthenticatedUser()).WithDescription("Who is the user");
         }
+
     } 
 }
