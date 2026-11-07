@@ -1,4 +1,5 @@
 using FluentValidation;
+using Invory.AuthHandler;
 using Invory.Db;
 using Invory.Endpoints;
 using Invory.Models.BDModels;
@@ -6,36 +7,22 @@ using Invory.Models.HelperClasses;
 using Invory.Models.Interfaces;
 using Invory.Token;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi;
-using Microsoft.OpenApi.MicrosoftExtensions;
 using System.Text;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 1. Database Configuration
+string connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                          ?? builder.Configuration.GetSection("ConnectionStrings")["DefaultConnection"]
+                          ?? throw new InvalidOperationException("DefaultConnection string is missing.");
 
-string connectionString = builder.Configuration.GetSection("ConnectionStrings")["DefaultConnection"];
-/*
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("ReactAppPolicy", policy =>
-    {
-        policy.WithOrigins("http://localhost:3000") // примерен фрон енд на който даваме достъп
-              .AllowAnyHeader()                     // Разрешаваме всякакви хедъри (напр. Authorization)
-              .AllowAnyMethod();                    // Разрешаваме GET, POST, PUT, DELETE и т.н.
-    });
-});
-*/
-builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly, includeInternalTypes: true);
+builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
 
-builder.Services.AddTransient<IEmailSender, EmailSender>();
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
-builder.Services.AddProblemDetails();
+// 2. Identity Configuration
 builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
 {
     options.Password.RequiredLength = 6;
@@ -48,31 +35,19 @@ builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
 
-builder.Services.AddOpenApi();
+// 3. JWT & Authentication Configuration (Глобален стандарт по подразбиране)
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
                   ?? throw new InvalidOperationException("Jwt settings are missing in configuration.");
-
 var key = Encoding.UTF8.GetBytes(jwtSettings.Key);
 
-
-builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
-builder.Services.AddSingleton<PasswordHasher<User>>();
-
-builder.Services.AddSingleton<TokenProvider>();
-builder.Services.AddOpenApi(options =>
+builder.Services.AddAuthentication(options =>
 {
-    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
-});
-
-
-builder.Services.AddAuthentication(
-
-    //може да се сложи тук автоматично да искаме токени
-
-).AddJwtBearer(options =>
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
 {
-
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -82,18 +57,54 @@ builder.Services.AddAuthentication(
         ValidateLifetime = true,
         IssuerSigningKey = new SymmetricSecurityKey(key),
         ValidateIssuerSigningKey = true,
-        ClockSkew = TimeSpan.Zero//ако токен е изтекъл, няма допълнително време в което да важи
-
+        ClockSkew = TimeSpan.Zero // Без допълнителен толеранс след изтичане на токена
     };
-
 });
 
+// 4. Authorization Policies & Handlers Configuration
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("WorkspaceMemberPolicy", policy =>
+        policy.Requirements.Add(new WorkspaceMemberRequirement()));
 
-builder.Services.AddAuthorization(); 
+    options.AddPolicy("WorkspaceAdminPolicy", policy =>
+        policy.Requirements.Add(new WorkspaceAdminRequirement()));
+});
+
+// Регистрираме хендлърите в DI контейнера
+builder.Services.AddScoped<IAuthorizationHandler, WorkspaceMemberHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, WorkspaceAdminHandler>();
+
+// 5. CORS Policy (Конфигуриран за работа с HttpOnly бисквитки за рефреш токени)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ReactAppPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000") // Адрес на твоя фронтенд
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // Задължително за изпращане/приемане на cookies от клиентския 앱
+    });
+});
+
+// 6. Application Services & Validation
+builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly, includeInternalTypes: true);
+builder.Services.AddTransient<IEmailSender, EmailSender>();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+builder.Services.AddSingleton<PasswordHasher<User>>();
+builder.Services.AddSingleton<TokenProvider>();
+
+// 7. OpenAPI / Swagger Setup
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+});
+
 var app = builder.Build();
 
+// --- HTTP PIPELINE ---
 
-//app.UseCors("ReactAppPolicy");
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -104,20 +115,18 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
-
-
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
+// CORS трябва да е преди Authentication/Authorization и след StaticFiles
+app.UseCors("ReactAppPolicy");
 
 app.UseAuthentication();
-
 app.UseAuthorization();
 
-
-
+// Map Endpoints
 app.MapAuthenticationEndpoints();
+app.MapWorkspaceEndpoints();
 app.MapGet("/", () => "sup");
-
 
 app.Run();

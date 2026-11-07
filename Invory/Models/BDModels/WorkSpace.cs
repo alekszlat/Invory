@@ -6,14 +6,23 @@ namespace Invory.Models.BDModels
     {
         [Key]
         public int Id { get; set; }
-        public string WorkspaceName { get; set; }
+
+        [Required]
+        [MaxLength(100)]
+        public string WorkspaceName { get; set; } 
+
+        [MaxLength(300)]
+        public string? Description { get; set; }
 
 
-        public  List<WorkspaceRoleUserTable> WorkspaceRUTable { get; set; } = new List<WorkspaceRoleUserTable>();
-        public List<User> Users { get; set; } = new List<User>();
+ 
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        public List<Asset> Assets { get; set; } = new List<Asset>();
-        public List<SubWorkSpace> SubWorkSpaces { get; set; } = new List<SubWorkSpace>();
-
+   
+        public List<WorkspaceRoleUserTable> WorkspaceRUTable { get; set; } = new();
+        public List<User> Users { get; set; } = new();
+        public List<Asset> Assets { get; set; } = new();
+        public List<SubWorkSpace> SubWorkSpaces { get; set; } = new();
     }
 }

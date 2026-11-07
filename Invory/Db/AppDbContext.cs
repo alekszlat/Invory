@@ -22,9 +22,9 @@ namespace Invory.Db
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            base.OnModelCreating(modelBuilder);
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
-            base.OnModelCreating(modelBuilder);
 
             modelBuilder.Entity<User>().ToTable("User");
 
@@ -37,7 +37,8 @@ namespace Invory.Db
             .WithMany(Users => Users.Workspaces)
             .UsingEntity<WorkspaceRoleUserTable>();
 
-
+            modelBuilder.Entity<Asset>().HasIndex(a => new { a.WorkspaceId, a.InventoryNumber })
+                .IsUnique();
 
 
 
@@ -49,14 +50,20 @@ namespace Invory.Db
            .UsingEntity<SubWorkspaceRoleUserTable>();
 
 
+            modelBuilder.Entity<SubWorkspaceRoleUserTable>()
+           .Property(wu => wu.subWorkspaceRole)
+           .HasConversion<string>();
+
 
             // Конвертиране на Enum ролята към текст в базата данни 
             modelBuilder.Entity<WorkspaceRoleUserTable>()
                 .Property(wu => wu.workspaceRole)
                 .HasConversion<string>();
 
+
+
             modelBuilder.Entity<Asset>()
-           .Property(asset => asset.status)
+           .Property(asset => asset.Status)
            .HasConversion<string>();
 
             modelBuilder.Entity<User>(entity =>

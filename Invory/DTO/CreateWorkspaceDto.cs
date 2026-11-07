@@ -1,5 +1,5 @@
 ﻿namespace Invory.DTO
 {
-    record CreateWorkspaceDto(string name);
+   public record CreateWorkspaceDto(string name,string ?description);
    
 }
