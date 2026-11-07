@@ -2,7 +2,7 @@
 {
     public enum AssetStatus
     {
-        Active,Repair,Scrapped
+        Active,Repair,Scrapped,Archived
 
     }
 }

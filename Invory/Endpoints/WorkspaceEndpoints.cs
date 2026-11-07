@@ -1,11 +1,12 @@
 ﻿using Invory.Db;
 using Invory.DTO;
+using Invory.HelperClasses;
 using Invory.Models.BDModels;
 using Invory.Models.enums;
-using Invory.Models.HelperClasses;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.Win32;
 using System.Security.Claims;
 
@@ -16,7 +17,7 @@ namespace Invory.Endpoints
         public static void MapWorkspaceEndpoints(this IEndpointRouteBuilder app)
         {
             // 1. Взимане на детайли за конкретен регистър (Изисква да си член)
-            app.MapGet("/{registerId:int}", async Task<Results<NotFound, Ok<WorkspacePageDto>>> (
+            app.MapGet("/registers/{registerId:int}", async Task<Results<NotFound, Ok<WorkspacePageDto>>> (
                 int registerId,
                 AppDbContext dbContext,
                 ClaimsPrincipal user) =>
@@ -26,7 +27,7 @@ namespace Invory.Endpoints
                 var workspace = await dbContext.WorkSpaces
            .AsSplitQuery()
            .Include(w => w.WorkspaceRUTable)
-               .ThenInclude(rut => rut.User) 
+               .ThenInclude(rut => rut.User)
            .Include(w => w.Assets)
            .Include(w => w.SubWorkSpaces)
                .ThenInclude(sw => sw.Users)
@@ -39,13 +40,13 @@ namespace Invory.Endpoints
 
 
                 WorkspaceRoleUserTable adminUserTB = workspace.WorkspaceRUTable
-                 .Where(rut => rut.workspaceRole==WorkspaceRole.Admin).FirstOrDefault();
+                 .Where(rut => rut.workspaceRole == WorkspaceRole.Admin).FirstOrDefault();
 
                 User AdminUser = adminUserTB.User;
 
 
                 WorkspaceRoleUserTable currentUserTB = workspace.WorkspaceRUTable
-              .Where(rut => rut.UserId==currentUserId).FirstOrDefault();
+              .Where(rut => rut.UserId == currentUserId).FirstOrDefault();
 
 
                 var dto = new WorkspacePageDto(
@@ -53,9 +54,9 @@ namespace Invory.Endpoints
                     name: workspace.WorkspaceName,
                     description: workspace.Description,
                     ownerId: AdminUser.Id,
-                    owner: new UserDto(AdminUser.Id,AdminUser.UserName, AdminUser.Email),
+                    owner: new UserDto(AdminUser.Id, AdminUser.UserName, AdminUser.Email),
                     role: currentUserTB.workspaceRole.ToString(),
-                    assetCount: workspace.Assets.Count(a => a.ArchivedAt == null),
+                    assetCount: workspace.Assets.Count(ass => ass.Status != AssetStatus.Archived),
                     createdAt: workspace.CreatedAt,
                     updatedAt: workspace.UpdatedAt
                 );
@@ -69,10 +70,10 @@ namespace Invory.Endpoints
 
             // 2. Списък с регистри на текущия потребител (Остава стандартна аутентикация, тъй като няма registerId в руута)
             app.MapGet("/registers", async Task<Results<NotFound, Ok<PagedResultDto<WorkspaceMainPage>>>> (
-                int? page,
-                int? pageSize,
                 AppDbContext dbContext,
-                ClaimsPrincipal user) =>
+                ClaimsPrincipal user,
+                int page = 1,
+                int pageSize = 20) =>
             {
                 var userIdString = user.FindFirstValue(ClaimTypes.NameIdentifier);
                 if (!int.TryParse(userIdString, out int currentUserId))
@@ -80,18 +81,20 @@ namespace Invory.Endpoints
                     return TypedResults.NotFound();
                 }
 
-                var pagination = new PaginationCalculator(page, pageSize);
 
                 var baseQuery = dbContext.WorkSpaces
                  .AsNoTracking()
                  .Where(w => w.WorkspaceRUTable.Any(rut => rut.UserId == currentUserId));
 
                 int totalItems = await baseQuery.CountAsync();
+                int totalPages;
+                int skip;
+                var meta = PaginationCalculator.CalculateMeta(totalItems, out totalPages, out skip, page, pageSize);
 
                 var items = await baseQuery
                     .OrderByDescending(wp => wp.CreatedAt)
-                    .Skip(pagination.Skip)
-                    .Take(pagination.PageSize)
+                    .Skip(skip)
+                    .Take(pageSize)
                     .Select(wp => new WorkspaceMainPage(
                         Id: wp.Id,
                         name: wp.WorkspaceName,
@@ -102,7 +105,6 @@ namespace Invory.Endpoints
                     ))
                     .ToListAsync();
 
-                var meta = pagination.CalculateMeta(totalItems);
 
                 var pagedResult = new PagedResultDto<WorkspaceMainPage>(
                     Items: items,
@@ -144,17 +146,17 @@ namespace Invory.Endpoints
                 await context.WorkspaceRoleUserTables.AddAsync(newConnection);
                 await context.SaveChangesAsync();
 
-                var resourceUrl = $"/workspaces/{workSpace.Id}";
+                var resourceUrl = $"/registers/{workSpace.Id}";
 
-                WorkspaceDto wpDtoRead= new WorkspaceDto(workSpace.WorkspaceName, workSpace.Description);
+                WorkspaceDto wpDtoRead = new WorkspaceDto(workSpace.WorkspaceName, workSpace.Description);
                 return TypedResults.Created(resourceUrl, wpDtoRead);
 
 
             })
             .RequireAuthorization();
 
-            // 4. Бързо четране на суров workspace по ID (Изисква да си член)
-            app.MapGet("/workspaces/{registerId:int}", async (int registerId, AppDbContext context) =>
+            /*
+            app.MapGet("/registers/{registerId}", async (int registerId, AppDbContext context) =>
             {
                 var workspace = await context.WorkSpaces
                     .AsNoTracking()
@@ -170,9 +172,10 @@ namespace Invory.Endpoints
             })
             .RequireAuthorization("WorkspaceMemberPolicy")
             .WithDescription("Returns a workspace from a specific id");
+            */
 
-            // 5. Редакция на регистър (Изисква Admin или Owner права чрез новата политика!)
-            app.MapPatch("/registers/{registerId}", async Task<Results<NotFound, BadRequest<string>, Ok<WorkspaceMainPage>>> (
+            // 5. Редакция на регистър (Изисква Admin)
+            app.MapPatch("/registers/{registerId:int}", async Task<Results<NotFound, BadRequest<string>, Ok<WorkspaceMainPage>>> (
                 int registerId,
                 UpdateRegisterDto dto,
                 AppDbContext dbContext,
@@ -201,27 +204,23 @@ namespace Invory.Endpoints
                 workspace.UpdatedAt = DateTime.UtcNow;
                 await dbContext.SaveChangesAsync();
 
-                var currentUserId = int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
-                var userRole = workspace.WorkspaceRUTable
-                    .Where(rut => rut.UserId == currentUserId)
-                    .Select(rut => rut.workspaceRole)
-                    .FirstOrDefault();
+
 
                 var updatedRecord = new WorkspaceMainPage(
                     Id: workspace.Id,
                     name: workspace.WorkspaceName,
                     description: workspace.Description,
-                    role: userRole.ToString(),
+                    role: WorkspaceRole.Admin.ToString(),
                     createdAt: workspace.CreatedAt,
                     updatedAt: workspace.UpdatedAt
                 );
 
                 return TypedResults.Ok(updatedRecord);
             })
-            .RequireAuthorization("WorkspaceAdminPolicy"); 
+            .RequireAuthorization("WorkspaceAdminPolicy");
 
 
-        
+
             app.MapGet("/profile", async (ClaimsPrincipal user, UserManager<User> userManager, AppDbContext context) =>
             {
                 var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -239,57 +238,288 @@ namespace Invory.Endpoints
 
 
 
+            app.MapGet("/registers/{registerId:int}/assets", async Task<IResult> (int registerId, string? name, string? inventoryNumber, string? location,
+           int? quantity,
+           string? custodian,
+           DateTime? acquiredOn,
+           string? unit,
+           AssetStatus? assetStatus,
+           string? sourceDocument,
+           ClaimsPrincipal user,
+           AppDbContext context,
+           bool includeArchived = false,
+           int page = 1,
+           int pageSize = 20
+                 ) =>
+            {
 
-
-
-
-
-
-
-            app.MapGet("/registers/{registerId}/assets", async (int registerId,int page,int pageSize,string name,int inventoryNumber,string location,int quantity
-                ,string ?custodian,DateTime? acquiredOn,string ?unit, AssetStatus? assetStatus,string sourceDocument
-                , ClaimsPrincipal user, AppDbContext context) => {
-
-                int userId;
-                
-                Int32.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
-                if (userId == null)
+                if (!int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out int userId) || userId <= 0)
                 {
-                    TypedResults.BadRequest("user id is not int");
+                    return TypedResults.BadRequest("User ID is invalid or missing.");
                 }
 
-                var workspaceQuery= context.WorkSpaces.Where(workspace => workspace.Id == registerId);
-                if (workspaceQuery == null)
+
+                bool workspaceExists = await context.WorkSpaces
+                    .AsNoTracking()
+                    .AnyAsync(w => w.Id == registerId);
+
+                if (!workspaceExists)
                 {
                     return TypedResults.NotFound();
                 }
-                workspaceQuery = workspaceQuery.Include(wp => wp.Assets);
 
-                var list = await workspaceQuery.Select(wp => wp.Assets.Select(ass=>new AssetDtoPageDto(ass.Id,wp.Id,ass.Name,ass.InventoryNumber,ass.Location,ass.Custodian,
-                    ass.AcquiredOn,ass.Unit,ass.Quantity,ass.Status.ToString(),ass.SourceDocument,ass.ArchivedAt,ass.Version,ass.CreatedAt,ass.UpdatedAt))).ToListAsync();
+                var assetsQuery = context.Assets
+                    .AsNoTracking()
+                    .Where(a => a.WorkspaceId == registerId);
 
 
-                var pagination = new PaginationCalculator(page, pageSize);
-                    /*
-                var meta = pagination.CalculateMeta(
-                    );
+                if (!string.IsNullOrEmpty(name))
+                    assetsQuery = assetsQuery.Where(a => a.Name.Contains(name));
 
-                var pagedResult = new PagedResultDto<WorkspaceMainPage>(
-                    Items: list,
+                if (!string.IsNullOrEmpty(inventoryNumber))
+                    assetsQuery = assetsQuery.Where(a => a.InventoryNumber.Contains(inventoryNumber));
+
+                if (!string.IsNullOrEmpty(location))
+                    assetsQuery = assetsQuery.Where(a => a.Location.Contains(location));
+
+                if (quantity.HasValue)
+                    assetsQuery = assetsQuery.Where(a => a.Quantity == quantity.Value);
+
+                if (!string.IsNullOrEmpty(custodian))
+                    assetsQuery = assetsQuery.Where(a => a.Custodian != null && a.Custodian.Contains(custodian));
+
+                if (acquiredOn.HasValue)
+                {
+                    var targetDate = acquiredOn.Value.Date;
+                    assetsQuery = assetsQuery.Where(a => a.AcquiredOn.HasValue && a.AcquiredOn.Value.Date == targetDate);
+                }
+
+                if (!string.IsNullOrEmpty(unit))
+                    assetsQuery = assetsQuery.Where(a => a.Unit != null && a.Unit.Contains(unit));
+
+                if (assetStatus.HasValue)
+                    assetsQuery = assetsQuery.Where(a => a.Status == assetStatus.Value);
+
+                if (!string.IsNullOrEmpty(sourceDocument))
+                    assetsQuery = assetsQuery.Where(a => a.SourceDocument != null && a.SourceDocument.Contains(sourceDocument));
+
+                if (!includeArchived)
+                {
+                    assetsQuery = assetsQuery.Where(a => a.ArchivedAt == null);
+                }
+
+
+                int totalItems = await assetsQuery.CountAsync();
+
+
+                PaginationMetaDto meta = PaginationCalculator.CalculateMeta(
+                    totalItems,
+                    out int totalPages,
+                    out int skip,
+                    page,
+                    pageSize
+                );
+
+
+                var items = await assetsQuery
+                    .Skip(skip)
+                    .Take(meta.PageSize)
+                    .Select(ass => new AssetDtoPageDto(
+                        ass.Id,
+                        registerId,
+                        ass.Name,
+                        ass.InventoryNumber,
+                        ass.Location,
+                        ass.Custodian,
+                        ass.AcquiredOn,
+                        ass.Unit,
+                        ass.Quantity,
+                        ass.Status.ToString(),
+                        ass.SourceDocument,
+                        ass.ArchivedAt,
+                        ass.Version,
+                        ass.CreatedAt,
+                        ass.UpdatedAt
+                    ))
+                    .ToListAsync();
+
+                // 9. Опаковаме ги в крайното DTO и връщаме 200 OK
+                var pagedResult = new PagedResultDto<AssetDtoPageDto>(
+                    Items: items,
                     Pagination: meta
                 );
-                    */
-                    return null;
 
+                return TypedResults.Ok(pagedResult);
 
-            }).RequireAuthorization("WorkspaceAdminPolicy"); 
-
+            }).RequireAuthorization("WorkspaceAdminPolicy");
 
 
 
-            //GET / registers /{ registerId}/ assets
+            app.MapPost("/registers/{registerId:int}/assets", async Task<IResult> (int registerId, AppDbContext dbContext, CreateAssetDto createAssetDto) =>
+            {
+
+                var query = dbContext.Assets.Where(asset => asset.WorkspaceId == registerId);
+
+                if (query == null)
+                {
+                    return TypedResults.BadRequest("Register doesnt exist");
+                }
+
+                Asset asset = new Asset
+                {
+                    Name = createAssetDto.Name,
+                    InventoryNumber = createAssetDto.InventoryNumber,
+                    Location = createAssetDto.Location,
+                    Quantity = createAssetDto.Quantity,
+                    Custodian = createAssetDto.Custodian,
+                    AcquiredOn = createAssetDto.AcquiredOn,
+                    Unit = string.IsNullOrEmpty(createAssetDto.Unit) ? "бр." : createAssetDto.Unit,
+                    Status = createAssetDto.Status ?? AssetStatus.Active,
+                    SourceDocument = createAssetDto.SourceDocument,
+                    Version = 1, //starts from 1
+                    CreatedAt = DateTime.UtcNow,
+                    WorkspaceId = registerId,
+                    UpdatedAt = DateTime.UtcNow,
+                    ArchivedAt = null
+                };
+
+                dbContext.Assets.Add(asset);
+                await dbContext.SaveChangesAsync();
+                return TypedResults.Created($"/registers/{registerId}/assets/{asset.Id}", asset);
+
+            }).RequireAuthorization("WorkspaceAdminPolicy");
 
 
+
+            //GET /registers/{registerId}/assets/{assetId}
+
+         app.MapGet("/registers/{registerId:int}/assets/{assetId:int}", async Task<IResult>
+         (int registerId, int assetId, AppDbContext dbContext, ClaimsPrincipal user) =>
+            {
+                int userId;
+                if (!Int32.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out userId))
+                {
+                    return TypedResults.Unauthorized(); // Добавено return
+                }
+
+                var connection = await dbContext.WorkspaceRoleUserTables
+                    .Where(wu => wu.UserId == userId && wu.WorkspaceId == registerId)
+                    .FirstOrDefaultAsync();
+
+                // Защита срещу NullReferenceException, ако потребителят изобщо няма запис тук
+                if (connection == null)
+                {
+                    return TypedResults.Unauthorized();
+                }
+                   //Има право до ендпойнта ако е админ или участва в subworkspace, който и потребител участва
+                if (!(connection.workspaceRole == WorkspaceRole.Admin))
+                {
+                    //Ако не е админ,взимаме sub Workspace-а ,който съдържа asset-а, който търсим, ако има такъв asset
+                    var subWp = await dbContext.SubWorkSpaces
+                        .Where(sWp => sWp.WorkspaceId == registerId && sWp.Assets.Any(a => a.Id == assetId))
+                        .FirstOrDefaultAsync();
+
+                    if (subWp == null)
+                    {
+                        return TypedResults.NotFound();
+                    }
+
+                    //чрез  таблица проверяваме ако потребителя има достъп до него
+                    bool hasSubAccess = await dbContext.SubWorkspaceRoleUserTables
+                        .AnyAsync(sWpMjdTablica => sWpMjdTablica.UserId == userId && sWpMjdTablica.SubWorkSpaceId == subWp.Id);
+
+                    if (!hasSubAccess)
+                    {
+                        return TypedResults.Unauthorized();
+                    }
+                }
+
+                var asset = await dbContext.Assets
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(a => a.Id == assetId && a.WorkspaceId == registerId);
+
+                if (asset == null)
+                {
+                    return TypedResults.NotFound();
+                }
+
+                return TypedResults.Ok(asset);
+            }).RequireAuthorization();
+
+            //PATCH /registers/{registerId}/assets/{assetId}
+            //UpdateAssetDto
+
+            app.MapPatch("/registers/{registerId:int}/assets/{assetId:int}", async Task<IResult>
+     (int registerId, int assetId, AppDbContext dbContext, UpdateAssetDto updateAssetDto) =>
+            {
+                // 1. Взимаме актива асинхронно (с await!)
+                var asset = await dbContext.Assets
+                    .FirstOrDefaultAsync(ass => ass.Id == assetId && ass.WorkspaceId == registerId);
+
+                if (asset == null)
+                {
+                    return TypedResults.NotFound(new { error = "Asset not found" });
+                }
+
+                // 2. Присвояваме полетата само ако са подадени (не са null)
+                if (updateAssetDto.Name != null)
+                {
+                    asset.Name = updateAssetDto.Name;
+                }
+
+                if (updateAssetDto.InventoryNumber != null)
+                {
+                    asset.InventoryNumber = updateAssetDto.InventoryNumber;
+                }
+
+                if (updateAssetDto.Location != null)
+                {
+                    asset.Location = updateAssetDto.Location;
+                }
+
+                if (updateAssetDto.Quantity.HasValue)
+                {
+                    asset.Quantity = updateAssetDto.Quantity.Value;
+                }
+
+                if (updateAssetDto.Custodian != null)
+                {
+                    asset.Custodian = updateAssetDto.Custodian;
+                }
+
+                if (updateAssetDto.AcquiredOn.HasValue)
+                {
+                    asset.AcquiredOn = updateAssetDto.AcquiredOn.Value;
+                }
+
+                if (updateAssetDto.Unit != null)
+                {
+                    asset.Unit = updateAssetDto.Unit;
+                }
+
+                if (updateAssetDto.Status.HasValue)
+                {
+                    asset.Status = updateAssetDto.Status.Value;
+                }
+
+                if (updateAssetDto.SourceDocument != null)
+                {
+                    asset.SourceDocument = updateAssetDto.SourceDocument;
+                }
+                if(updateAssetDto.ExpectedVersion.HasValue&&updateAssetDto.ExpectedVersion!= asset.Version)
+                {
+                    return TypedResults.Conflict();
+                }
+
+                asset.UpdatedAt = DateTime.UtcNow;
+                asset.Version += 1;
+
+           
+                await dbContext.SaveChangesAsync();
+
+                return TypedResults.Ok(asset);
+            })
+     .RequireAuthorization("WorkspaceAdminPolicy");
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿using Invory.Models.BDModels;
 
-namespace Invory.Models.HelperClasses
+namespace Invory.HelperClasses
 {
     public class RefreshToken
     {

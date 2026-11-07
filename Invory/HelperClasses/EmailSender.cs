@@ -1,7 +1,7 @@
 ﻿using Invory.Models.Interfaces;
 using MailKit.Net.Smtp;
 using MimeKit;
-namespace Invory.Models.HelperClasses
+namespace Invory.HelperClasses
 {
     public class EmailSender : IEmailSender
     {

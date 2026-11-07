@@ -2,7 +2,6 @@
 
 namespace Invory.DTO
 {
-    public record UpdateRegisterDto(string? WorkspaceName, string? Description
- );
+    public record UpdateRegisterDto(string? WorkspaceName, string? Description);
 
 }

@@ -1,4 +1,4 @@
-﻿using Invory.Models.HelperClasses;
+﻿
 
 namespace Invory.DTO
 {
@@ -9,7 +9,7 @@ namespace Invory.DTO
         string InventoryNumber,
         string Location,
         string? Custodian,
-        string? AcquiredOn, 
+        DateTime? AcquiredOn, 
         string Unit,
         decimal Quantity,
         string Status,

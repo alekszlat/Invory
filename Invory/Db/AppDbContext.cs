@@ -1,5 +1,5 @@
-﻿using Invory.Models.BDModels;
-using Invory.Models.HelperClasses;
+﻿using Invory.HelperClasses;
+using Invory.Models.BDModels;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +15,12 @@ namespace Invory.Db
         public DbSet<Asset> Assets { get; set; }
         public DbSet<WorkspaceRoleUserTable> WorkspaceRoleUserTables { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<SubWorkspaceRoleUserTable> SubWorkspaceRoleUserTables { get; set; }
+
+
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+
+
         {
 
 
@@ -60,6 +65,10 @@ namespace Invory.Db
                 .Property(wu => wu.workspaceRole)
                 .HasConversion<string>();
 
+
+            modelBuilder.Entity<Asset>()
+           .HasIndex(a => new { a.WorkspaceId, a.InventoryNumber })
+           .IsUnique();
 
 
             modelBuilder.Entity<Asset>()

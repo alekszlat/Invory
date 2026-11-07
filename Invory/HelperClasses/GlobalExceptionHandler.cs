@@ -1,4 +1,4 @@
-﻿namespace Invory.Models.HelperClasses
+﻿namespace Invory.HelperClasses
 {
     using Microsoft.AspNetCore.Diagnostics;
     using Microsoft.AspNetCore.Http;

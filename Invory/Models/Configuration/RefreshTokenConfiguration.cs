@@ -1,4 +1,4 @@
-﻿using Invory.Models.HelperClasses;
+﻿using Invory.HelperClasses;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

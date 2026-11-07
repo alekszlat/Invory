@@ -2,9 +2,8 @@
 {
     using Invory.Db;
     using Invory.DTO;
-    using Invory.Models.BDModels;
-    using Invory.Models.HelperClasses;
-    using Microsoft.AspNetCore.Identity;
+    using Invory.HelperClasses;
+    using Invory.Models.BDModels;    using Microsoft.AspNetCore.Identity;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.Options;
     using Microsoft.IdentityModel.Tokens;

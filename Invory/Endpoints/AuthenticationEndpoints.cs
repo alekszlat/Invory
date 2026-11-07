@@ -1,7 +1,7 @@
 ﻿using Invory.Db;
 using Invory.DTO;
+using Invory.HelperClasses;
 using Invory.Models.BDModels;
-using Invory.Models.HelperClasses;
 using Invory.Models.Interfaces;
 using Invory.Token;
 using Invory.Validators;
