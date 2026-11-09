@@ -1,6 +1,6 @@
 import { setupWorker } from 'msw/browser';
 import { apiBaseUrl } from '../api/config.js';
-import { createDatabase, demoUsers, mockIdentityKey, mockStorageKey } from './database.js';
+import { createDatabase, mockIdentityKey, mockStorageKey } from './database.js';
 import { createHandlers } from './handlers.js';
 
 export async function startMocks(onChange) {
@@ -16,9 +16,4 @@ export async function startMocks(onChange) {
     if (request.url.startsWith(`${base}/`)) print.error();
   } });
   window.addEventListener('storage', event => { if (event.key === mockStorageKey || event.key === null) onChange(); });
-  return {
-    users: demoUsers,
-    currentUserId: mockSession.get,
-    reset() { database.reset(); },
-  };
 }

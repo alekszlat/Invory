@@ -1,6 +1,6 @@
 import Button from '../../shared/ui/Button.jsx';
 import { ClipboardList, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import EmptyState from '../../shared/ui/EmptyState.jsx';
 import PageHeader from '../../shared/ui/PageHeader.jsx';
 import AssetFilters from './AssetFilters.jsx';
@@ -12,9 +12,16 @@ export default function RegisterView({
   register, registerId, subregisterId, userId, onAdd, onOpen, kicker = 'Организационен регистър', extraActions, assetActions,
 }) {
   const [search, setSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
-  const filters = { subregisterId, search: search.trim(), status, page, pageSize: 20 };
+  const filters = { subregisterId, search: appliedSearch, status, page, pageSize: 20 };
+
+  // Waits for a pause in typing, so that a search costs one server call rather than one per letter.
+  useEffect(() => {
+    const timer = setTimeout(() => { setAppliedSearch(search.trim()); setPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
   const query = useApiQuery(userId, `assets:${registerId}`, filters, signal => assetsApi.list(registerId, filters, signal));
   const count = register.assetCount;
   const result = query.data;
@@ -34,7 +41,7 @@ export default function RegisterView({
             <h2 id="assets-title" className="text-lg font-semibold tracking-tight">Активи</h2>
             <span className="inline-flex rounded-lg bg-[#f0f1f4] dark:bg-[#2b2d33] px-2.5 py-1 text-xs font-medium text-[#62646c] dark:text-[#b0b2be] tabular-nums">{count} {count === 1 ? 'актив' : 'актива'}</span>
           </div>
-          {count > 0 && <AssetFilters search={search} status={status} onSearchChange={value => { setSearch(value); setPage(1); }} onStatusChange={value => { setStatus(value); setPage(1); }} />}
+          {count > 0 && <AssetFilters search={search} status={status} onSearchChange={setSearch} onStatusChange={value => { setStatus(value); setPage(1); }} />}
         </div>
         {query.error && <p role="alert" className="mb-3 text-sm text-[#b32830] dark:text-[#ffb1b8]">{query.error.message}</p>}
         {query.isPending ? <p role="status">Зареждане на активи…</p> : count ? (

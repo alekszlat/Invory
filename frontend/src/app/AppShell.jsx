@@ -1,4 +1,3 @@
-import { Select } from '../shared/ui/FormControls.jsx';
 import Button from '../shared/ui/Button.jsx';
 import { Box, Plus, UserRound } from 'lucide-react';
 import { navigation } from './navigation.js';
@@ -32,7 +31,7 @@ function Sidebar({ section, pendingCount, onNavigate, onCreate }) {
 }
 
 export default function AppShell({
-  section, pendingCount, profileId, demoUsers, onSwitchProfile, onReset, onLogout, onNavigate, onCreate, error, notice, children,
+  section, pendingCount, userName, onLogout, onNavigate, onCreate, error, notice, children,
 }) {
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[240px_minmax(0,1fr)]">
@@ -46,13 +45,7 @@ export default function AppShell({
           <p className="text-sm font-medium text-[#62646c] dark:text-[#b0b2be]">{navigation.find(page => page.id === section)?.label ?? 'Покана'}</p>
           <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2.5 [&>svg]:text-[#62646c] dark:[&>svg]:text-[#b0b2be]">
             <UserRound size={17} strokeWidth={1.7} aria-hidden="true" />
-            {demoUsers?.length ? <>
-              <label htmlFor="demo-profile" className="text-xs font-medium text-[#62646c] dark:text-[#b0b2be]">Демо профил</label>
-              <Select id="demo-profile" fullWidth={false} className="max-w-full max-[479px]:flex-1" value={profileId} onChange={event => onSwitchProfile(event.target.value)}>
-                {demoUsers.map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
-              </Select>
-              <Button type="button" variant="secondary" onClick={onReset}>Нулирай демо данните</Button>
-            </> : <span className="text-sm">{profileId || 'Профил'}</span>}
+            <span className="text-sm wrap-anywhere">{userName || 'Профил'}</span>
             <Button type="button" variant="secondary" onClick={onLogout}>Изход</Button>
           </div>
         </header>

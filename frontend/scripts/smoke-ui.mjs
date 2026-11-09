@@ -6,17 +6,56 @@ const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 
+const password = 'test-password-1';
+const admin = { name: 'Елена Петрова', email: 'elena@example.test' };
+const participant = { name: 'Иван Иванов', email: 'ivan@example.test' };
+const guest = { name: 'Мария Георгиева', email: 'maria@example.test' };
+
+// getByLabel matches parts of words, and "Парола" is also part of "Повторете паролата".
+const passwordField = () => page.getByLabel('Парола', { exact: true });
+
+async function fillSignUp(account, repeated = password) {
+  await page.getByRole('heading', { name: 'Вход в профила' }).waitFor();
+  await page.getByRole('button', { name: 'Създайте профил' }).click();
+  await page.getByLabel('Име и фамилия').fill(account.name);
+  await page.getByLabel('Имейл').fill(account.email);
+  await passwordField().fill(password);
+  await page.getByLabel('Повторете паролата').fill(repeated);
+  await page.getByRole('button', { name: 'Създай профил', exact: true }).click();
+}
+async function logIn(account, typed = password) {
+  await page.getByLabel('Имейл').fill(account.email);
+  await passwordField().fill(typed);
+  await page.getByRole('button', { name: 'Вход', exact: true }).click();
+}
+async function logOut() {
+  await page.getByRole('button', { name: 'Изход' }).click();
+  await page.getByRole('heading', { name: 'Вход в профила' }).waitFor();
+}
+
 try {
   await page.goto(base);
-  await page.getByRole('heading', { name: 'Вход в профила' }).waitFor();
-  await page.getByLabel('Имейл').fill('elena@example.test');
-  await page.getByLabel('Парола').fill('wrong');
-  await page.getByRole('button', { name: 'Вход', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Невалиден имейл или парола');
-  await page.getByLabel('Парола').fill('demo');
-  await page.getByRole('button', { name: 'Вход', exact: true }).click();
+  await fillSignUp(admin, 'different-password');
+  await expect(page.locator('main')).toContainText('Паролите не съвпадат');
+  await page.getByLabel('Повторете паролата').fill(password);
+  await page.getByRole('button', { name: 'Създай профил', exact: true }).click();
   await page.getByRole('heading', { name: 'Работни регистри' }).waitFor();
-  await page.getByRole('button', { name: 'Нулирай демо данните' }).click();
+  await expect(page.locator('body')).not.toContainText(/демо/i);
+  await expect(page.getByRole('banner')).toContainText(admin.name);
+  await expect(page.getByRole('main')).toContainText('Все още няма регистри');
+
+  await logOut();
+  await logIn(admin, 'wrong-password');
+  await expect(page.getByRole('alert')).toContainText('Невалиден имейл или парола');
+  await logIn(admin);
+  await page.getByRole('heading', { name: 'Работни регистри' }).waitFor();
+  await logOut();
+  await fillSignUp(admin);
+  await expect(page.locator('main')).toContainText('Вече има профил с този имейл');
+  await page.getByRole('button', { name: 'Влезте' }).click();
+  await logIn(admin);
+  await page.getByRole('heading', { name: 'Работни регистри' }).waitFor();
+
   await page.getByRole('button', { name: 'Нов регистър' }).last().click();
   let dialog = page.getByRole('dialog');
   await dialog.getByLabel('Име на регистъра').fill('UI регистър');
@@ -52,15 +91,18 @@ try {
   dialog = page.getByRole('dialog');
   await dialog.getByRole('checkbox', { name: /Лаптоп за проверка/ }).check();
   await dialog.getByRole('button', { name: 'Запази обхвата' }).click();
+  await expect(page.getByRole('status')).toContainText('Обхватът на подрегистъра е запазен');
   await page.getByRole('button', { name: 'Покани профил' }).click();
   dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: 'Генерирай връзка' }).click();
   const participantLink = await dialog.locator('form').getByLabel('Връзка за покана').inputValue();
   await dialog.getByRole('button', { name: 'Затвори' }).click();
 
-  await page.getByLabel('Демо профил').selectOption('custodian');
-  await expect(page).toHaveURL(/#subregisters$/);
+  // A new colleague opens the link without an account and signs up from it.
+  await logOut();
   await page.goto(participantLink);
+  await expect(page.locator('main')).toContainText('Получили сте покана');
+  await fillSignUp(participant);
   await page.getByRole('button', { name: 'Приеми поканата' }).click();
   await expect(page.getByRole('heading', { name: 'UI обхват' })).toBeVisible();
   await page.getByRole('button', { name: 'Свери' }).click();
@@ -71,8 +113,9 @@ try {
   await dialog.getByRole('button', { name: 'Подай заявка' }).click();
   await expect(page.getByRole('status')).toContainText('Заявката е изпратена');
 
-  await page.getByLabel('Демо профил').selectOption('accounting');
-  await expect(page).toHaveURL(/#invited$/);
+  await logOut();
+  await logIn(admin);
+  await page.getByRole('heading', { name: 'Работни регистри' }).waitFor();
   await page.goto(`${base}#requests`);
   await page.getByRole('button', { name: 'Одобри' }).click();
   dialog = page.getByRole('dialog');
@@ -90,9 +133,10 @@ try {
   await dialog.getByRole('button', { name: 'Генерирай връзка' }).click();
   const guestLink = await dialog.locator('form').getByLabel('Връзка за покана').inputValue();
   await dialog.getByRole('button', { name: 'Затвори' }).click();
-  await page.getByLabel('Демо профил').selectOption('viewer');
-  await expect(page).toHaveURL(/#subregisters$/);
+
+  await logOut();
   await page.goto(guestLink);
+  await fillSignUp(guest);
   await page.getByRole('button', { name: 'Приеми поканата' }).click();
   await expect(page.getByRole('table')).toContainText('Лаптоп за проверка');
   await expect(page.getByRole('button', { name: 'Свери' })).toHaveCount(0);
@@ -101,14 +145,13 @@ try {
   await page.reload();
   await expect(page.getByRole('table')).toContainText('Лаптоп за проверка');
   await expect(page.getByRole('button', { name: 'Свери' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Изход' }).click();
-  await expect(page.getByRole('heading', { name: 'Вход в профила' })).toBeVisible();
+  await logOut();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Вход в профила' })).toBeVisible();
-  await page.getByRole('button', { name: 'Мария · Преглед' }).click();
+  await logIn(guest);
   await expect(page.getByRole('heading', { name: 'Работни регистри' })).toBeVisible();
   if (errors.length) throw new Error(errors.join('\n'));
-  console.log('UI mock flow passed: login, create, duplicate, scope, links, participant request, approval, history, guest read-only search, reload, logout.');
+  console.log('UI flow passed: sign-up, login, create, duplicate, scope, invitation sign-up, participant request, approval, history, guest read-only search, reload, logout.');
 } finally {
   await browser.close();
 }

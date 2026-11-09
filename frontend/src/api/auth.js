@@ -7,7 +7,6 @@ async function session(path, body) {
 }
 
 export const authApi = {
-  me: signal => http('/auth/me', { signal }),
   login: body => session('/auth/login', body),
   register: body => session('/auth/register', body),
   refresh: () => session('/auth/refresh'),

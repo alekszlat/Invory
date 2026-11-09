@@ -3,8 +3,10 @@ info:
   title: Invory API
   version: 1.0.0
   description: >-
-    Register, asset, sharing, request, and history contract. The browser mock implements the same resource operations.
-    Authentication uses a short-lived JWT access token and an HttpOnly refresh cookie in the real backend.
+    Exact technical contract for registers, assets, sharing, requests, and history. docs/api-contract.md explains the same
+    API in plain language. The browser stand-in server implements the same operations. Authentication uses a short-lived
+    JWT access token and an HttpOnly refresh cookie in the real backend. Rules that refuse a change, such as a repeated
+    inventory number, answer 422.
 servers:
   - url: /api/v1
 security:
@@ -46,8 +48,6 @@ x-write-errors:
     $ref: '#/components/responses/Error'
   '404':
     $ref: '#/components/responses/Error'
-  '409':
-    $ref: '#/components/responses/Error'
   '422':
     $ref: '#/components/responses/Error'
   default:
@@ -57,9 +57,9 @@ x-invite-errors:
     $ref: '#/components/responses/Error'
   '404':
     $ref: '#/components/responses/Error'
-  '409':
-    $ref: '#/components/responses/Error'
   '410':
+    $ref: '#/components/responses/Error'
+  '422':
     $ref: '#/components/responses/Error'
   default:
     $ref: '#/components/responses/Error'
@@ -79,8 +79,6 @@ paths:
         '400':
           $ref: '#/components/responses/Error'
         '401':
-          $ref: '#/components/responses/Error'
-        '409':
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
@@ -105,17 +103,6 @@ paths:
         '422':
           $ref: '#/components/responses/Error'
         default:
-          $ref: '#/components/responses/Error'
-  /auth/me:
-    get:
-      tags:
-        - Authentication
-      summary: Get the current authenticated user
-      operationId: currentUser
-      responses:
-        '200':
-          $ref: '#/components/responses/User'
-        '401':
           $ref: '#/components/responses/Error'
   /auth/refresh:
     post:
@@ -175,8 +162,6 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-        '409':
-          $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
         default:
@@ -184,24 +169,6 @@ paths:
   /registers/{registerId}:
     parameters:
       - $ref: '#/components/parameters/RegisterId'
-    get:
-      tags:
-        - Registers
-      summary: Get an owned register
-      operationId: getRegister
-      responses:
-        '200':
-          $ref: '#/components/responses/Register'
-        '401':
-          $ref: '#/components/responses/Error'
-        '403':
-          $ref: '#/components/responses/Error'
-        '404':
-          $ref: '#/components/responses/Error'
-        '422':
-          $ref: '#/components/responses/Error'
-        default:
-          $ref: '#/components/responses/Error'
     patch:
       tags:
         - Registers
@@ -219,8 +186,6 @@ paths:
         '403':
           $ref: '#/components/responses/Error'
         '404':
-          $ref: '#/components/responses/Error'
-        '409':
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
@@ -291,8 +256,6 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-        '409':
-          $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
         default:
@@ -339,8 +302,6 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-        '409':
-          $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
         default:
@@ -361,8 +322,6 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-        '409':
-          $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
         default:
@@ -370,27 +329,6 @@ paths:
   /registers/{registerId}/subregisters:
     parameters:
       - $ref: '#/components/parameters/RegisterId'
-    get:
-      tags:
-        - Subregisters
-      summary: List child scopes; owner only
-      operationId: listSubregisters
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
-      responses:
-        '200':
-          $ref: '#/components/responses/SubregisterList'
-        '401':
-          $ref: '#/components/responses/Error'
-        '403':
-          $ref: '#/components/responses/Error'
-        '404':
-          $ref: '#/components/responses/Error'
-        '422':
-          $ref: '#/components/responses/Error'
-        default:
-          $ref: '#/components/responses/Error'
     post:
       tags:
         - Subregisters
@@ -409,8 +347,6 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-        '409':
-          $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
         default:
@@ -419,24 +355,6 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RegisterId'
       - $ref: '#/components/parameters/SubregisterId'
-    get:
-      tags:
-        - Subregisters
-      summary: Get an accessible child scope and permissions
-      operationId: getSubregister
-      responses:
-        '200':
-          $ref: '#/components/responses/Subregister'
-        '401':
-          $ref: '#/components/responses/Error'
-        '403':
-          $ref: '#/components/responses/Error'
-        '404':
-          $ref: '#/components/responses/Error'
-        '422':
-          $ref: '#/components/responses/Error'
-        default:
-          $ref: '#/components/responses/Error'
     patch:
       tags:
         - Subregisters
@@ -454,8 +372,6 @@ paths:
         '403':
           $ref: '#/components/responses/Error'
         '404':
-          $ref: '#/components/responses/Error'
-        '409':
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
@@ -504,8 +420,6 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-        '409':
-          $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
         default:
@@ -529,8 +443,6 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-        '409':
-          $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
         default:
@@ -550,9 +462,9 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-        '409':
-          $ref: '#/components/responses/Error'
         '410':
+          $ref: '#/components/responses/Error'
+        '422':
           $ref: '#/components/responses/Error'
         default:
           $ref: '#/components/responses/Error'
@@ -620,8 +532,6 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-        '409':
-          $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
         default:
@@ -642,8 +552,6 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-        '409':
-          $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
         default:
@@ -652,17 +560,9 @@ paths:
     get:
       tags:
         - Requests
-      summary: List incoming owner requests or own participant submissions
+      summary: List requests for registers the current account owns and requests it submitted
       operationId: listRequests
       parameters:
-        - name: view
-          in: query
-          schema:
-            type: string
-            enum:
-              - incoming
-              - submitted
-            default: incoming
         - name: registerId
           in: query
           schema:
@@ -711,8 +611,6 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-        '409':
-          $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
         default:
@@ -737,8 +635,6 @@ paths:
         '403':
           $ref: '#/components/responses/Error'
         '404':
-          $ref: '#/components/responses/Error'
-        '409':
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
@@ -793,7 +689,9 @@ components:
       in: path
       required: true
       schema:
-        type: string
+        type: integer
+        minimum: 1
+      description: The asset's number, for example 8
     SubregisterId:
       name: subregisterId
       in: path
@@ -907,7 +805,6 @@ components:
             $ref: '#/components/schemas/AssetPatch'
           example:
             location: Каб. 303
-            expectedVersion: 1
     SubregisterCreate:
       required: true
       content:
@@ -924,8 +821,7 @@ components:
             $ref: '#/components/schemas/SubregisterPatch'
           example:
             assetIds:
-              - asset_8
-            expectedVersion: 1
+              - 8
     InvitationCreate:
       required: true
       content:
@@ -951,8 +847,7 @@ components:
             $ref: '#/components/schemas/RequestInput'
           example:
             subregisterId: sub_5
-            assetId: asset_8
-            assetVersion: 1
+            assetId: 8
             kind: location
             note: Преместен при инвентаризация
             location: Каб. 303
@@ -972,12 +867,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-    User:
-      description: Current user
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/User'
     Session:
       description: Access token and current user; login and refresh also set or rotate the HttpOnly refresh cookie
       content:
@@ -1109,10 +998,10 @@ components:
       properties:
         id:
           type: string
-          example: accounting
+          example: user_12
         name:
           type: string
-          example: Елена · Счетоводство
+          example: Елена Петрова
         email:
           type: string
           format: email
@@ -1153,6 +1042,7 @@ components:
         password:
           type: string
           minLength: 8
+          maxLength: 200
           writeOnly: true
     LoginInput:
       type: object
@@ -1204,15 +1094,6 @@ components:
       enum:
         - participant
         - guest
-    Permission:
-      type: string
-      enum:
-        - read
-        - manage
-        - share
-        - decide
-        - check
-        - request
     AssetStatus:
       type: string
       enum:
@@ -1241,8 +1122,8 @@ components:
         - description
         - owner
         - assetCount
+        - subregisters
         - role
-        - permissions
         - createdAt
         - updatedAt
       properties:
@@ -1262,17 +1143,13 @@ components:
           minimum: 0
           description: Non-archived assets
           example: 1
+        subregisters:
+          type: array
+          description: Every subregister of this register
+          items:
+            $ref: '#/components/schemas/Subregister'
         role:
           $ref: '#/components/schemas/Role'
-        permissions:
-          type: array
-          items:
-            $ref: '#/components/schemas/Permission'
-          example:
-            - read
-            - manage
-            - share
-            - decide
         createdAt:
           type: string
           format: date-time
@@ -1321,13 +1198,14 @@ components:
         - status
         - sourceDocument
         - archivedAt
-        - version
         - createdAt
         - updatedAt
       properties:
         id:
-          type: string
-          example: asset_8
+          type: integer
+          minimum: 1
+          description: Whole number given by the server in order (1, 2, 3...)
+          example: 8
         registerId:
           type: string
           example: reg_42
@@ -1367,10 +1245,6 @@ components:
             - 'null'
           format: date-time
           example: null
-        version:
-          type: integer
-          minimum: 1
-          example: 1
         createdAt:
           type: string
           format: date-time
@@ -1436,9 +1310,6 @@ components:
         - required: [status]
         - required: [sourceDocument]
       properties:
-        expectedVersion:
-          type: integer
-          minimum: 1
         name:
           type: string
           minLength: 1
@@ -1482,13 +1353,11 @@ components:
         - registerId
         - name
         - assetIds
-        - version
         - createdAt
         - updatedAt
         - registerName
         - memberCount
         - role
-        - permissions
       properties:
         id:
           type: string
@@ -1503,12 +1372,10 @@ components:
           type: array
           uniqueItems: true
           items:
-            type: string
+            type: integer
+            minimum: 1
           example:
-            - asset_8
-        version:
-          type: integer
-          minimum: 1
+            - 8
         createdAt:
           type: string
           format: date-time
@@ -1523,10 +1390,6 @@ components:
           minimum: 0
         role:
           $ref: '#/components/schemas/Role'
-        permissions:
-          type: array
-          items:
-            $ref: '#/components/schemas/Permission'
     SubregisterInput:
       type: object
       additionalProperties: false
@@ -1552,11 +1415,9 @@ components:
           type: array
           uniqueItems: true
           items:
-            type: string
-        expectedVersion:
-          type: integer
-          minimum: 1
-      description: At least one of name or assetIds is required; expectedVersion alone is invalid.
+            type: integer
+            minimum: 1
+      description: At least one of name or assetIds is required.
     Invitation:
       type: object
       additionalProperties: false
@@ -1655,7 +1516,8 @@ components:
         - inventoryNumber
       properties:
         id:
-          type: string
+          type: integer
+          minimum: 1
         name:
           type: string
         inventoryNumber:
@@ -1673,7 +1535,6 @@ components:
         - location
         - originalLocation
         - originalStatus
-        - originalAssetVersion
         - status
         - reason
         - createdAt
@@ -1692,7 +1553,8 @@ components:
         subregisterId:
           type: string
         assetId:
-          type: string
+          type: integer
+          minimum: 1
         kind:
           $ref: '#/components/schemas/RequestKind'
         note:
@@ -1703,9 +1565,6 @@ components:
           type: string
         originalStatus:
           $ref: '#/components/schemas/AssetStatus'
-        originalAssetVersion:
-          type: integer
-          minimum: 1
         status:
           $ref: '#/components/schemas/RequestStatus'
         reason:
@@ -1736,7 +1595,6 @@ components:
       required:
         - subregisterId
         - assetId
-        - assetVersion
         - kind
       allOf:
         - if:
@@ -1759,8 +1617,6 @@ components:
         subregisterId:
           type: string
         assetId:
-          type: string
-        assetVersion:
           type: integer
           minimum: 1
         kind:
@@ -1820,8 +1676,9 @@ components:
             - 'null'
         assetId:
           type:
-            - string
+            - integer
             - 'null'
+          minimum: 1
         at:
           type: string
           format: date-time
