@@ -1,0 +1,10 @@
+﻿namespace Invory.DTO { 
+
+    public record CreatedSubWorkspaceDto(
+    int Id,
+    string SubWorkspaceName,
+    int WorkspaceId,
+    List<string> assetsNames,
+    List<string> usersNames
+);
+}

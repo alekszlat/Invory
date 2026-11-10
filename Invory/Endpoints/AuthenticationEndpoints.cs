@@ -19,7 +19,7 @@ namespace Invory.Endpoints
     {
         public static void MapAuthenticationEndpoints(this IEndpointRouteBuilder app)
         {
-            var authGroup = app.MapGroup("/api/v1/auth");
+            var authGroup = app.MapGroup("/auth");
 
             // 1. LOGIN (Публичен)
             authGroup.MapPost("/login", async Task<Results<BadRequest<string>, Ok<AuthResponseDto>>> (
@@ -101,7 +101,7 @@ namespace Invory.Endpoints
             authGroup.MapGet("/confirm-email", async Task<Results<BadRequest<string>, Ok<string>>> (
                 int userId,
                 string token,
-                TokenProvider tokenProvider,AppDbContext dbContext,HttpContext httpContext,
+                  AppDbContext dbContext,HttpContext httpContext,
                 UserManager<User> userManager, IOptions<JwtSettings> options) =>
             {
                 if (userId <= 0 || string.IsNullOrEmpty(token))
@@ -231,6 +231,9 @@ namespace Invory.Endpoints
             })
             .RequireAuthorization()
             .WithDescription("Returns current authenticated user details");
+
+
+            //GET /registers/{registerId}/assets/{assetId}
         }
     }
 }

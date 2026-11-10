@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -87,6 +88,11 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+{
+    // Превръща енъмите в стрингове (напр. "Viewer" вместо 0)
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 // 6. Application Services & Validation
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly, includeInternalTypes: true);
 builder.Services.AddTransient<IEmailSender, EmailSender>();
@@ -124,9 +130,14 @@ app.UseCors("ReactAppPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
+
+var apiV1Group = app.MapGroup("/api/v1");
 // Map Endpoints
-app.MapAuthenticationEndpoints();
-app.MapWorkspaceEndpoints();
+apiV1Group.MapAuthenticationEndpoints();
+//apiV1Group.MapWorkspaceEndpoints();
+apiV1Group.MapAssetsEndpoints();
+apiV1Group.MapSubRegistersEndpoints();
+apiV1Group.MapInvitationsEndpoints();
 app.MapGet("/", () => "sup");
 
 app.Run();

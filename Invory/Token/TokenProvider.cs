@@ -3,7 +3,9 @@
     using Invory.Db;
     using Invory.DTO;
     using Invory.HelperClasses;
-    using Invory.Models.BDModels;    using Microsoft.AspNetCore.Identity;
+    using Invory.Models.BDModels;
+    using Invory.Models.enums;
+    using Microsoft.AspNetCore.Identity;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.Options;
     using Microsoft.IdentityModel.Tokens;
@@ -20,7 +22,33 @@
         {
             jwtSettings = options.Value;
         }
+        private TokenExpDate MakeToken(List<Claim> claims)
+        {
+            var jwtKey = jwtSettings.Key;//тайната, ключ 
+            var keyBytes = Encoding.UTF8.GetBytes(jwtKey);//превръшаме в байтове
+            var symmetricKey = new SymmetricSecurityKey(keyBytes);
+            var credentials = new SigningCredentials(symmetricKey, SecurityAlgorithms.HmacSha256);// по алгоритъм кодираме
 
+            int expirationDate = jwtSettings.ExpirationInMinutes;
+
+            //данните за нашия токен
+            var tokenDescriptor = new JwtSecurityToken(
+                issuer: jwtSettings.Issuer,
+                audience: jwtSettings.Audience,
+                claims: claims,
+                expires: DateTime.UtcNow.AddMinutes(expirationDate),
+                signingCredentials: credentials
+            );
+
+
+            var tokenString = new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);//самия токен
+
+
+            return new TokenExpDate(
+               tokenString,
+               DateTime.UtcNow.AddMinutes(expirationDate)
+           );
+        }
         public TokenExpDate CreateUserToken(User user)
         {
             //Данните за нашия токен
@@ -32,31 +60,20 @@
             };
 
 
-            var jwtKey = jwtSettings.Key;//тайната, ключ 
-            var keyBytes = Encoding.UTF8.GetBytes(jwtKey);//превръшаме в байтове
-            var symmetricKey = new SymmetricSecurityKey(keyBytes);
-            var credentials = new SigningCredentials(symmetricKey, SecurityAlgorithms.HmacSha256);// по алгоритъм кодираме
+            return MakeToken(claims);
 
-            int keyInspirationTimeInMinutes = jwtSettings.ExpirationInMinutes;
+        }
 
-
-            //данните за нашия токен
-            var tokenDescriptor = new JwtSecurityToken(
-                issuer: jwtSettings.Issuer,
-                audience: jwtSettings.Audience,
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(keyInspirationTimeInMinutes),
-                signingCredentials: credentials
-            );
-
-         
-            var tokenString = new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);//самия токен
+        public TokenExpDate CreateWorkspaceInvitationToken(int workspaceId)
+        {
+            //Данните за нашия токен
+            List<Claim> claims = new List<Claim>
+            {
+               new Claim("WorkspaceId", workspaceId.ToString()),
+            };
 
 
-            return new TokenExpDate(
-               tokenString,
-               DateTime.UtcNow.AddMinutes(keyInspirationTimeInMinutes)
-           );
+            return MakeToken(claims);
 
         }
 

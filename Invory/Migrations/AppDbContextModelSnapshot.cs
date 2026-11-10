@@ -22,6 +22,35 @@ namespace Invory.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Invory.HelperClasses.RefreshToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ExpireTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokens");
+                });
+
             modelBuilder.Entity("Invory.Models.BDModels.Asset", b =>
                 {
                     b.Property<int>("Id")
@@ -30,8 +59,8 @@ namespace Invory.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("AcquiredOn")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime?>("AcquiredOn")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("ArchivedAt")
                         .HasColumnType("datetime2");
@@ -105,6 +134,10 @@ namespace Invory.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("SubWorkspaceName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("WorkspaceId")
                         .HasColumnType("int");
 
@@ -123,14 +156,15 @@ namespace Invory.Migrations
                     b.Property<int>("SubWorkSpaceId")
                         .HasColumnType("int");
 
-                    b.Property<int>("subWorkspaceRole")
-                        .HasColumnType("int");
+                    b.Property<string>("subWorkspaceRole")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("UserId", "SubWorkSpaceId");
 
                     b.HasIndex("SubWorkSpaceId");
 
-                    b.ToTable("SubWorkspaceRoleUserTable");
+                    b.ToTable("SubWorkspaceRoleUserTables");
                 });
 
             modelBuilder.Entity("Invory.Models.BDModels.User", b =>
@@ -232,6 +266,38 @@ namespace Invory.Migrations
                     b.ToTable("WorkSpaces");
                 });
 
+            modelBuilder.Entity("Invory.Models.BDModels.WorkspaceInvitation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("InvokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsUsed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("WorkspaceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WorkspaceInvitations");
+                });
+
             modelBuilder.Entity("Invory.Models.BDModels.WorkspaceRoleUserTable", b =>
                 {
                     b.Property<int>("UserId")
@@ -249,35 +315,6 @@ namespace Invory.Migrations
                     b.HasIndex("WorkspaceId");
 
                     b.ToTable("WorkspaceRoleUserTables");
-                });
-
-            modelBuilder.Entity("Invory.Models.HelperClasses.RefreshToken", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("ExpireTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Token")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("RefreshTokens");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<int>", b =>
@@ -413,6 +450,17 @@ namespace Invory.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Invory.HelperClasses.RefreshToken", b =>
+                {
+                    b.HasOne("Invory.Models.BDModels.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Invory.Models.BDModels.Asset", b =>
                 {
                     b.HasOne("Invory.Models.BDModels.SubWorkSpace", "SubWorkspace")
@@ -477,17 +525,6 @@ namespace Invory.Migrations
                     b.Navigation("User");
 
                     b.Navigation("Workspace");
-                });
-
-            modelBuilder.Entity("Invory.Models.HelperClasses.RefreshToken", b =>
-                {
-                    b.HasOne("Invory.Models.BDModels.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>

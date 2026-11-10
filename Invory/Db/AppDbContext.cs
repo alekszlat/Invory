@@ -16,6 +16,7 @@ namespace Invory.Db
         public DbSet<WorkspaceRoleUserTable> WorkspaceRoleUserTables { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<SubWorkspaceRoleUserTable> SubWorkspaceRoleUserTables { get; set; }
+        public DbSet<WorkspaceInvitation> WorkspaceInvitations { get; set; }
 
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
@@ -44,6 +45,10 @@ namespace Invory.Db
 
             modelBuilder.Entity<Asset>().HasIndex(a => new { a.WorkspaceId, a.InventoryNumber })
                 .IsUnique();
+            modelBuilder.Entity<Asset>()
+                .Property(ass => ass.Status)
+                .HasConversion<string>();
+
 
 
 

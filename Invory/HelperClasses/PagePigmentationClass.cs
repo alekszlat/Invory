@@ -6,8 +6,10 @@
        
  
 
-        public static PaginationMetaDto CalculateMeta( int totalItems,out int totalPages, out int skip, int page = 1, int pageSize = 20)
+        public static PaginationMetaDto CalculateMeta( int totalItems,out int totalPages, out int skip,ref int page , ref int pageSize)
         {
+            pageSize = Math.Clamp(pageSize, 5, 100);
+
             if (totalItems <= 0)
             {
                 totalPages = 0;
@@ -21,7 +23,6 @@
             }
 
 
-            pageSize = Math.Clamp(pageSize, 5, 100);
             totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
 
             page = Math.Clamp(page, 1, totalPages);

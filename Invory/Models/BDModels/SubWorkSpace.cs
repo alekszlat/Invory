@@ -2,8 +2,9 @@
 {
     public class SubWorkSpace
     {
-        public int Id { get; set; }
 
+        public int Id { get; set; }
+        public string SubWorkspaceName { get; set; }
         public int WorkspaceId { get; set; }
         public WorkSpace Workspace { get; set; }
 

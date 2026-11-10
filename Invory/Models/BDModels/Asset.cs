@@ -22,10 +22,10 @@ namespace Invory.Models.BDModels
         [StringLength(120, ErrorMessage = "Custodian can be up to 120 characters.")]
         public string? Custodian { get; set; }            // МОЛ / Отговорно лице (0–120 знака)
 
-        public string? AcquiredOn { get; set; }           // Дата на придобиване "YYYY-MM-DD"
+        public DateTime? AcquiredOn { get; set; }           // Дата на придобиване "YYYY-MM-DD"
 
         [StringLength(12, ErrorMessage = "Unit can be up to 12 characters.")]
-        public string Unit { get; set; } = "бр.";         // Мерна единица (дефолт "бр.")
+        public string Unit { get; set; } = "Count";         // Мерна единица (дефолт "бр.")
 
         [Range(0.000001, double.MaxValue, ErrorMessage = "Quantity must be a positive finite number.")]
         public decimal Quantity { get; set; }             // Положително число
@@ -52,4 +52,4 @@ namespace Invory.Models.BDModels
         public int? SubWorkspaceId { get; set; }
         public SubWorkSpace? SubWorkspace { get; set; }
     }
-}
+}   
