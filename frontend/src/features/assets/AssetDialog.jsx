@@ -37,6 +37,7 @@ export default function AssetDialog({ registerName, asset, onClose, onSave }) {
           <Select name="status" defaultValue={asset?.status ?? 'Активен'}>
             <option>Активен</option>
             <option>За ремонт</option>
+            {/* An asset becomes "Бракуван" only through an approved disposal request. The option appears only to keep that value when the asset is edited. */}
             {asset?.status === 'Бракуван' && <option>Бракуван</option>}
           </Select>
         </Field>

@@ -23,6 +23,7 @@ export default function Dialog({ title, description, onClose, pending = false, c
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
       onCancel={event => {
+        // Escape would close the native dialog without React knowing. The parent removes the dialog instead, and only when no save is running.
         event.preventDefault();
         if (!pending) onClose();
       }}

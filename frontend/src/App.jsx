@@ -1,29 +1,27 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+
 import Button, { ActionLink } from './shared/ui/Button.jsx';
+import { roleLabels } from './shared/labels.js';
+
+import AppDialogs from './app/AppDialogs.jsx';
 import AppShell from './app/AppShell.jsx';
-import { navigateTo, readRoute, registerHref } from './app/navigation.js';
-import { allPages, configureSessionExpired } from './api/client.js';
-import { authApi } from './api/auth.js';
+import { readRoute, registerHref } from './app/navigation.js';
+import { useAppActions } from './app/useAppActions.js';
+import { useSession } from './app/useSession.js';
+
+import { allPages } from './api/client.js';
 import { registersApi } from './api/registers.js';
-import { assetsApi } from './api/assets.js';
-import { subregistersApi } from './api/subregisters.js';
 import { sharingApi } from './api/sharing.js';
 import { requestsApi } from './api/requests.js';
 import { historyApi } from './api/history.js';
-import { clearPrivateCache, queryClient, useApiQuery } from './api/query.js';
-import { requestLabels, roleLabels } from './shared/labels.js';
-import AssetDetails from './features/assets/AssetDetails.jsx';
+import { useApiQuery } from './api/query.js';
+
 import LoginPage from './features/auth/LoginPage.jsx';
-import AssetDialog from './features/assets/AssetDialog.jsx';
 import RegisterView from './features/assets/RegisterView.jsx';
 import HistoryView from './features/history/HistoryView.jsx';
 import InvitedList from './features/invitations/InvitedList.jsx';
-import RegisterDialog from './features/registers/RegisterDialog.jsx';
 import RegisterList from './features/registers/RegisterList.jsx';
-import { DecisionDialog, ObservationDialog } from './features/requests/RequestDialogs.jsx';
 import RequestsView from './features/requests/RequestsView.jsx';
-import { InviteDialog, ScopeDialog, SubregisterDialog } from './features/subregisters/SubregisterDialogs.jsx';
 import SubregistersView from './features/subregisters/SubregistersView.jsx';
 
 function AcceptInvitation({ token, onAccept, pending, error }) {
@@ -36,20 +34,25 @@ function AcceptInvitation({ token, onAccept, pending, error }) {
 }
 
 export default function App() {
-  const [sessionKey, setSessionKey] = useState('initial');
   const [route, setRoute] = useState(readRoute);
   const [dialog, setDialog] = useState(null);
   const [notice, setNotice] = useState('');
   const [actionError, setActionError] = useState('');
-  const [accepting, setAccepting] = useState(false);
   const { section, registerId, subregisterId } = route;
-  const me = useQuery({ queryKey: ['auth', sessionKey], queryFn: authApi.refresh, retry: false });
+
+  const { me, login, signUp, logout } = useSession({
+    onChange() { setDialog(null); setNotice(''); setActionError(''); },
+    onError(error) { setActionError(error.message); },
+  });
   const userId = me.data?.user.id;
+
   const ownedQuery = useApiQuery(userId, 'registers', {}, signal => allPages(registersApi.list, {}, signal));
   const invitedQuery = useApiQuery(userId, 'invited-scopes', {}, signal => allPages(sharingApi.invited, {}, signal));
   const owned = ownedQuery.data ?? [];
   const invitations = invitedQuery.data ?? [];
   const register = owned.find(entry => entry.id === registerId);
+
+  // The subregisters page needs a selected register, so it opens the first one when the hash names none.
   const managed = register ?? owned[0];
   const managedSubs = managed?.subregisters ?? [];
   const subregister = managedSubs.find(entry => entry.id === subregisterId) ?? managedSubs[0];
@@ -57,11 +60,10 @@ export default function App() {
   const memberQuery = useApiQuery(userId, 'members', subregister?.id,
     signal => allPages((params, nextSignal) => sharingApi.members(managed.id, subregister.id, params, nextSignal), {}, signal),
     Boolean(subregister && section === 'subregisters'));
-  const scopeAssets = useApiQuery(userId, 'scope-assets', managed?.id,
-    signal => allPages((params, nextSignal) => assetsApi.list(managed.id, params, nextSignal), { includeArchived: true }, signal),
-    Boolean(managed && dialog?.type === 'scope'));
   const requestsQuery = useApiQuery(userId, 'requests', {}, signal => allPages(requestsApi.list, {}, signal));
   const requests = requestsQuery.data ?? [];
+
+  // GET /requests returns both the requests for registers that this user owns and the requests that this user submitted.
   const incoming = requests.filter(request => owned.some(entry => entry.id === request.registerId));
   const submitted = requests.filter(request => request.requester.id === userId);
   const scopes = [
@@ -75,9 +77,8 @@ export default function App() {
   const historyQuery = useApiQuery(userId, 'history', historyScope?.path,
     signal => allPages((params, nextSignal) => historyApi.list(historyScope.registerId, params, nextSignal), { subregisterId: historyScope.subregisterId }, signal),
     Boolean(historyScope && section === 'history'));
-  const detail = ['details', 'editAsset'].includes(dialog?.type) ? dialog : null;
-  const detailsQuery = useApiQuery(userId, 'asset-detail', { registerId: detail?.registerId, subregisterId: detail?.subregisterId, assetId: detail?.assetId },
-    signal => assetsApi.get(detail.registerId, detail.assetId, { subregisterId: detail.subregisterId }, signal), Boolean(detail));
+
+  const actions = useAppActions({ userId, register, managed, subregister, invitedScope, setDialog, setNotice, setActionError });
 
   useEffect(() => {
     function updateRoute() { setRoute(readRoute()); setDialog(null); setActionError(''); window.scrollTo(0, 0); }
@@ -85,91 +86,20 @@ export default function App() {
     return () => window.removeEventListener('hashchange', updateRoute);
   }, []);
 
-  useEffect(() => {
-    configureSessionExpired(() => { void clearPrivateCache().then(() => setSessionKey(crypto.randomUUID())); });
-    return () => configureSessionExpired(() => {});
-  }, []);
-
-  async function openSession(session) {
-    await clearPrivateCache();
-    const nextKey = crypto.randomUUID();
-    queryClient.setQueryData(['auth', nextKey], session);
-    setSessionKey(nextKey);
-    setDialog(null); setNotice(''); setActionError('');
-  }
-  async function login(values) { await openSession(await authApi.login(values)); }
-  async function signUp(values) { await openSession(await authApi.register(values)); }
-  async function logout() {
-    try {
-      await authApi.logout();
-      await clearPrivateCache();
-      setSessionKey(crypto.randomUUID());
-      setDialog(null); setNotice(''); setActionError('');
-      navigateTo('');
-    } catch (error) { setActionError(error.message); }
-  }
-
-  function refreshed(message) {
-    queryClient.invalidateQueries({ queryKey: ['user', userId] });
-    setDialog(null); setNotice(message); setActionError('');
-  }
-  async function action(callback, message) {
-    setActionError('');
-    try { const result = await callback(); refreshed(message); return result; }
-    catch (error) { setActionError(error.message); throw error; }
-  }
-  async function accept(token) {
-    setAccepting(true); setActionError('');
-    try { const scope = await sharingApi.accept(token); refreshed('Поканата е приета.'); navigateTo(`invited/${scope.registerId}/${scope.id}`); }
-    catch (error) { setActionError(error.message); }
-    finally { setAccepting(false); }
-  }
-  async function saveRegister(values) {
-    const saved = await action(() => registersApi.create({ name: values.name, description: values.description }), 'Регистърът е създаден.');
-    navigateTo(registerHref(saved.id));
-  }
-  async function updateRegister(values) {
-    await action(() => registersApi.update(register.id, { name: values.name, description: values.description }), 'Регистърът е обновен.');
-  }
-  async function saveAsset(values, existing) {
-    const body = { ...values, quantity: Number(values.quantity), acquiredOn: values.acquiredOn || null };
-    delete body.assetIds;
-    if (existing) await action(() => assetsApi.update(register.id, existing.id, body), 'Активът е обновен.');
-    else await action(() => assetsApi.create(register.id, body), 'Активът е добавен в регистъра.');
-  }
-  async function saveSubregister(values) {
-    const saved = await action(() => subregistersApi.create(managed.id, { name: values.name }), 'Подрегистърът е създаден.');
-    navigateTo(`subregisters/${managed.id}/${saved.id}`);
-  }
-  async function renameSubregister(values) {
-    await action(() => subregistersApi.update(managed.id, subregister.id, { name: values.name }), 'Подрегистърът е преименуван.');
-  }
-  async function saveScope(values) {
-    await action(() => subregistersApi.update(managed.id, subregister.id, { assetIds: values.assetIds.map(Number) }), 'Обхватът на подрегистъра е запазен.');
-  }
-  async function observe(values) {
-    const body = { subregisterId: invitedScope.id, assetId: dialog.asset.id, kind: values.kind, note: values.note ?? '', location: values.location ?? '' };
-    await action(() => requestsApi.create(invitedScope.registerId, body), values.kind === 'present' ? 'Проверката е записана в историята.' : 'Заявката е изпратена до администратора.');
-  }
-  async function updateMember(id, role) {
-    try { await action(() => sharingApi.updateMember(managed.id, subregister.id, id, { role }), 'Ролята е обновена.'); } catch { /* The current view shows the error. */ }
-  }
-  async function removeMember(id) {
-    try { await action(() => sharingApi.removeMember(managed.id, subregister.id, id), 'Достъпът е премахнат.'); } catch { /* The current view shows the error. */ }
-  }
   const pendingCount = incoming.filter(request => request.status === 'pending').length;
   const loading = userId && (ownedQuery.isPending || invitedQuery.isPending);
   const globalError = me.error || ownedQuery.error || invitedQuery.error || requestsQuery.error;
 
   function renderView() {
-    if (section === 'accept') return <AcceptInvitation token={registerId} onAccept={accept} pending={accepting} error={actionError} />;
+    // In #accept/<token>, the route puts the invitation token in the registerId position.
+    if (section === 'accept') return <AcceptInvitation token={registerId} onAccept={actions.accept} pending={actions.accepting} error={actionError} />;
     if (loading) return <p role="status">Зареждане…</p>;
     if (globalError) return <p role="alert">{globalError.message}</p>;
     if (section === 'subregisters' && memberQuery.isPending && subregister) return <p role="status">Зареждане на участници…</p>;
     if (section === 'subregisters') return <SubregistersView owned={owned} register={managed ?? null}
       subregister={subregister} members={memberQuery.data ?? []} onCreate={() => setDialog({ type: 'subregister' })}
       onRename={() => setDialog({ type: 'editSubregister' })} onScope={() => setDialog({ type: 'scope' })} onInvite={() => setDialog({ type: 'invite' })}
-      onMemberRole={updateMember} onRemoveMember={removeMember} />;
+      onMemberRole={actions.updateMember} onRemoveMember={actions.removeMember} />;
     if (section === 'invited') {
       if (!invitedScope) return <InvitedList invitations={invitations} />;
       return <RegisterView key={invitedScope.id} userId={userId} registerId={invitedScope.registerId} subregisterId={invitedScope.id}
@@ -201,21 +131,7 @@ export default function App() {
   return <>
     <AppShell section={section} pendingCount={pendingCount} userName={me.data?.user.name} onLogout={logout} onNavigate={() => setNotice('')} onCreate={() => setDialog({ type: 'register' })}
       error={actionError || (globalError && !loading ? globalError.message : '')} notice={notice}>{renderView()}</AppShell>
-    {dialog?.type === 'register' && <RegisterDialog onClose={() => setDialog(null)} onSave={saveRegister} />}
-    {dialog?.type === 'editRegister' && register && <RegisterDialog register={register} onClose={() => setDialog(null)} onSave={updateRegister} />}
-    {dialog?.type === 'asset' && register && <AssetDialog registerName={register.name} onClose={() => setDialog(null)} onSave={values => saveAsset(values)} />}
-    {dialog?.type === 'editAsset' && register && detailsQuery.data && <AssetDialog registerName={register.name} asset={detailsQuery.data} onClose={() => setDialog(null)} onSave={values => saveAsset(values, detailsQuery.data)} />}
-    {dialog?.type === 'details' && detailsQuery.data && <AssetDetails asset={detailsQuery.data} onClose={() => setDialog(null)}
-      onEdit={detail.canManage ? () => setDialog({ ...detail, type: 'editAsset' }) : undefined}
-      onArchive={detail.canManage ? async () => { try { await action(() => assetsApi.archive(detail.registerId, detail.assetId), 'Активът е архивиран.'); } catch { /* The current view shows the error. */ } } : undefined} />}
-    {dialog?.type === 'subregister' && managed && <SubregisterDialog onClose={() => setDialog(null)} onSave={saveSubregister} />}
-    {dialog?.type === 'editSubregister' && subregister && <SubregisterDialog subregister={subregister} onClose={() => setDialog(null)} onSave={renameSubregister} />}
-    {dialog?.type === 'scope' && subregister && scopeAssets.isPending && <div role="status">Зареждане на активи…</div>}
-    {dialog?.type === 'scope' && subregister && scopeAssets.error && <p role="alert">{scopeAssets.error.message}</p>}
-    {dialog?.type === 'scope' && subregister && scopeAssets.data && <ScopeDialog assets={scopeAssets.data} subregister={subregister} onClose={() => setDialog(null)} onSave={saveScope} />}
-    {dialog?.type === 'invite' && subregister && <InviteDialog userId={userId} registerId={managed.id} subregister={subregister} onClose={() => setDialog(null)} onChanged={() => queryClient.invalidateQueries({ queryKey: ['user', userId] })} />}
-    {dialog?.type === 'observation' && invitedScope?.role === 'participant' && <ObservationDialog asset={dialog.asset} disposal={dialog.disposal} onClose={() => setDialog(null)} onSave={observe} />}
-    {dialog?.type === 'decision' && <DecisionDialog approve={dialog.status === 'approved'} description={requestLabels[dialog.request.kind]} onClose={() => setDialog(null)}
-      onSave={values => action(() => requestsApi.decide(dialog.request.id, { status: dialog.status, reason: values.reason ?? '' }), 'Решението е записано.')} />}
+    <AppDialogs dialog={dialog} setDialog={setDialog} userId={userId} register={register} managed={managed}
+      subregister={subregister} invitedScope={invitedScope} actions={actions} />
   </>;
 }

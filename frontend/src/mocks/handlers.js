@@ -105,10 +105,13 @@ export function createHandlers(database, baseUrl, mockSession = (() => {
   let current = null;
   return { get: () => current, set: id => { current = id; }, clear: () => { current = null; } };
 })()) {
+  // Each tab has its own token map in memory. A reload loses it, and /auth/refresh then issues a new token.
   const tokens = new Map();
   function issue(user, replace = false) {
     const accessToken = `mock.${id()}.${id()}`;
+    // 30 minutes matches the access token lifetime in docs/api-contract.md.
     const expiresAt = new Date(Date.now() + 30 * 60_000);
+    // Login and sign-up end every earlier session in this tab, so a token of the previous account stops working.
     if (replace) tokens.clear();
     tokens.set(accessToken, { userId: user.id, expiresAt: expiresAt.getTime() });
     mockSession.set(user.id);
@@ -125,6 +128,7 @@ export function createHandlers(database, baseUrl, mockSession = (() => {
         const result = await database.run(write, data => action({ data, user: requiresAuth ? userFor(data, request, tokens) : null, body: body ?? {}, url: new URL(request.url), p: routeParams }));
         return success === 204 ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(result, { status: success });
       } catch (error) {
+        // Every rule violation is a Fault. Any other error comes from browser storage, for example a full quota.
         return HttpResponse.json({ error: { code: error.code ?? 'MOCK_STORAGE_ERROR', message: error instanceof Fault ? error.message : 'Данните не могат да бъдат прочетени или запазени. Проверете паметта на браузъра.', fields: error.fields ?? {}, traceId: id() } }, { status: error.status ?? 500 });
       }
     });
@@ -234,6 +238,7 @@ export function createHandlers(database, baseUrl, mockSession = (() => {
       if (!('name' in body) && !('assetIds' in body)) invalid('body', 'Посочете поне едно поле.');
       if ('name' in body) sub.name = text(body, 'name', 100, true);
       if ('assetIds' in body) {
+        // An archived asset can stay in a scope that already has it, but it cannot be added to a new one.
         if (!Array.isArray(body.assetIds) || new Set(body.assetIds).size !== body.assetIds.length || body.assetIds.some(key => !data.assets.some(asset => asset.id === key && asset.registerId === register.id && (!asset.archivedAt || sub.assetIds.includes(key))))) invalid('assetIds', 'Изберете активи от родителския регистър.');
         sub.assetIds = [...body.assetIds];
       }
@@ -266,6 +271,7 @@ export function createHandlers(database, baseUrl, mockSession = (() => {
       const register = find(data.registers, invite.registerId);
       if (register.ownerId === user.id) fail(422, 'INVALID_TRANSITION', 'Администраторът вече има достъп до този обхват.');
       let member = data.memberships.find(member => member.subregisterId === invite.subregisterId && member.userId === user.id);
+      // A link that this user already accepted must not give back access after the administrator removed it.
       if (invite.acceptedBy.includes(user.id)) {
         if (!member) fail(422, 'INVALID_TRANSITION', 'Достъпът е премахнат. Необходима е нова покана.');
         return subView(data, find(data.subregisters, invite.subregisterId), user);
@@ -294,6 +300,7 @@ export function createHandlers(database, baseUrl, mockSession = (() => {
         const register = find(data.registers, request.registerId);
         const member = data.memberships.find(member => member.subregisterId === request.subregisterId && member.userId === user.id);
         const sub = find(data.subregisters, request.subregisterId);
+        // The requester loses sight of a request when they stop being a participant or the asset leaves the scope.
         return (register.ownerId === user.id || (request.requesterId === user.id && member?.role === 'participant' && sub.assetIds.includes(request.assetId)))
           && (!status || request.status === status) && ['registerId', 'subregisterId'].every(key => !url.searchParams.get(key) || request[key] === url.searchParams.get(key));
       }).map(request => requestView(data, request)), url);
@@ -314,6 +321,8 @@ export function createHandlers(database, baseUrl, mockSession = (() => {
       if (kind === 'location' && location === asset.location) invalid('location', 'Посочете различно местоположение.');
       if (data.requests.some(request => request.subregisterId === subregister.id && request.assetId === asset.id && request.requesterId === user.id && request.kind === kind && request.status === 'pending')) fail(422, 'DUPLICATE_REQUEST', 'Вече има такава заявка, която чака решение.');
       const at = now();
+      // A "present" check changes nothing in the asset, so it is approved at once. The original location
+      // and status are copied so that the request still shows the state before any later change.
       const request = { id: id(), registerId: register.id, subregisterId: subregister.id, assetId: asset.id, requesterId: user.id, kind, note, location, originalLocation: asset.location, originalStatus: asset.status, status: kind === 'present' ? 'approved' : 'pending', reason: '', createdAt: at, decidedAt: kind === 'present' ? at : null, decidedById: null };
       data.requests.unshift(request);
       event(data, user, register.id, kind === 'present' ? 'Потвърдена наличност' : 'Подадена заявка', `${requestLabels[kind]} · ${asset.name} · ${asset.inventoryNumber}`, { subregisterId: subregister.id, assetId: asset.id, participantId: user.id }); return requestView(data, request);
@@ -324,6 +333,7 @@ export function createHandlers(database, baseUrl, mockSession = (() => {
       if (request.status !== 'pending') fail(422, 'INVALID_TRANSITION', 'Заявката вече е обработена.');
       const reason = text(body, 'reason', 500, status === 'rejected') ?? '';
       const asset = find(data.assets, request.assetId); const sub = find(data.subregisters, request.subregisterId);
+      // The asset can change after the request was sent, so it is checked again at the time of the decision.
       if (status === 'approved' && (asset.archivedAt || asset.status === 'Бракуван' || !sub.assetIds.includes(asset.id))) fail(422, 'ASSET_UNAVAILABLE', 'Активът вече не е достъпен за тази заявка. Отхвърлете я и поискайте нова проверка.');
       const before = asset.location;
       if (status === 'approved' && ['location', 'disposal'].includes(request.kind)) {
@@ -338,6 +348,9 @@ export function createHandlers(database, baseUrl, mockSession = (() => {
     route('get', '/registers/:registerId/history', false, ({ data, user, p, url }) => {
       params(url, ['subregisterId']); const register = find(data.registers, p.registerId);
       const { subregister, role } = scopeFor(data, register, url.searchParams.get('subregisterId'), user);
+      // A subregister view shows its own events and the register-level events for its assets.
+      // A member does not see owner-only events (invitations and memberships), other participants' requests,
+      // or events for assets outside the scope.
       const events = data.history.filter(event => event.registerId === register.id
         && (!subregister || event.subregisterId === subregister.id || (!event.subregisterId && event.assetId && subregister.assetIds.includes(event.assetId)))
         && (role === 'owner' || (!event.ownerOnly && (!event.participantId || event.participantId === user.id) && (!event.assetId || subregister.assetIds.includes(event.assetId)))));

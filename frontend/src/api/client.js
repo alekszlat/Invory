@@ -1,8 +1,13 @@
 import { apiBaseUrl } from './config.js';
 
+// The access token lives only in memory so that page scripts cannot read it from storage.
+// After a reload, the HttpOnly refresh cookie gets a new token through refreshSession.
 let accessToken = null;
+// auth.js sets this through configureRefresh, because auth.js imports this module and a direct import back would be circular.
 let refreshSession = null;
 let sessionExpired = () => {};
+// The server replaces the refresh cookie on each use. Requests that fail with 401 at the same time
+// must share one refresh call, because a second call would send a cookie that is no longer valid.
 let refreshInFlight = null;
 
 export function setAccessToken(token) {
@@ -25,6 +30,7 @@ export class ApiError extends Error {
 }
 
 export async function http(path, { method = 'GET', body, params, signal, auth = true, credentials = 'omit' } = {}) {
+  // Vitest runs this module in Node, where there is no window.location to resolve a relative base URL against.
   const url = new URL(`${apiBaseUrl}${path}`, globalThis.location?.origin ?? 'http://localhost:5173');
   Object.entries(params ?? {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value));
@@ -41,6 +47,7 @@ export async function http(path, { method = 'GET', body, params, signal, auth = 
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
     } catch (error) {
+      // React Query aborts requests that it no longer needs. That is not a connection failure to show to the user.
       if (error.name === 'AbortError') throw error;
       throw new ApiError(0, { code: 'NETWORK_ERROR', message: 'Връзката със сървъра е неуспешна.' });
     }
@@ -53,9 +60,11 @@ export async function http(path, { method = 'GET', body, params, signal, auth = 
       response = await send();
     } catch (error) {
       clearAccessToken();
+      // Only a 401 from the refresh call means that the session has ended. After a network error, the next request tries the refresh again.
       if (error.status === 401) sessionExpired();
       throw error;
     }
+    // The refresh succeeded but the server still refuses the new token, so the session cannot be recovered.
     if (response.status === 401) { clearAccessToken(); sessionExpired(); }
   }
   if (response.status === 204) return null;
@@ -70,6 +79,7 @@ export async function allPages(list, params = {}, signal) {
   let page = 1;
   let result;
   do {
+    // 100 is the largest pageSize that the API accepts, so it gives the fewest calls.
     result = await list({ ...params, page, pageSize: 100 }, signal);
     items.push(...result.items);
     page += 1;

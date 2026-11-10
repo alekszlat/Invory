@@ -1,5 +1,7 @@
 import Dialog from '../../shared/ui/Dialog.jsx';
 
+// acquiredOn is a date without a time, and new Date() reads it as UTC midnight.
+// Formatting in UTC keeps time zones west of UTC from showing the previous day.
 const dateFormat = new Intl.DateTimeFormat('bg-BG', { dateStyle: 'medium', timeZone: 'UTC' });
 const quantityFormat = new Intl.NumberFormat('bg-BG');
 

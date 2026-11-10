@@ -37,6 +37,8 @@ export function ScopeDialog({ assets, subregister, onClose, onSave }) {
 
 export function InviteDialog({ userId, registerId, subregister, onClose, onChanged }) {
   const [role, setRole] = useState('participant');
+  // A datetime-local input takes local time without a zone. toISOString() gives UTC, so the date is shifted
+  // by the time zone offset first. The default validity is 7 days.
   const [expiresAt, setExpiresAt] = useState(() => {
     const date = new Date(Date.now() + 7 * 24 * 60 * 60_000);
     return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);

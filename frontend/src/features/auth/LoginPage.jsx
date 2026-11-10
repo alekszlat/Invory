@@ -28,6 +28,7 @@ export default function LoginPage({ onLogin, onSignUp, invited, initialError }) 
   const screen = screens[mode];
   const signingUp = mode === 'signup';
   const passwordType = showPassword ? 'text' : 'password';
+  // LOGIN_REQUIRED only means that there is no session yet, which is normal on this page and not an error to show.
   const banner = error || (initialError?.code !== 'LOGIN_REQUIRED' ? initialError?.message : '');
 
   function change(event) {

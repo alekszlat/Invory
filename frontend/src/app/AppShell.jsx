@@ -36,6 +36,7 @@ export default function AppShell({
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[240px_minmax(0,1fr)]">
       <a href="#main-content" className="fixed top-3 left-3 z-50 -translate-y-24 rounded-xl border border-[#858792] dark:border-[#777a88] bg-white dark:bg-[#232429] px-4 py-3 text-sm font-semibold text-[#005ac1] dark:text-[#9bcaff] focus:translate-y-0" onClick={event => {
+        // The router reads the hash, so following "#main-content" would leave the current page. Move focus by hand instead.
         event.preventDefault();
         document.getElementById('main-content').focus();
       }}>Към съдържанието</a>

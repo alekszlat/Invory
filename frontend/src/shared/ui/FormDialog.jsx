@@ -11,10 +11,12 @@ export default function FormDialog({ title, description, submitLabel, onClose, o
     if (pending) return;
 
     const form = new FormData(event.currentTarget);
+    // Object.fromEntries keeps only the last value of a repeated field, so the checked assetIds are read separately.
     const values = { ...Object.fromEntries(form), assetIds: form.getAll('assetIds') };
     setPending(true);
     setError('');
     try {
+      // pending stays true after a success, because the parent closes this dialog.
       await onSave(values);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Записването е неуспешно.');

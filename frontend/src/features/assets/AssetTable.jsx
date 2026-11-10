@@ -15,6 +15,7 @@ function AssetRow({ asset, onOpen, assetActions }) {
       <td className="max-w-44 px-5 py-4 wrap-anywhere">{asset.custodian || '—'}</td>
       <td className="px-5 py-4 whitespace-nowrap tabular-nums">{formatQuantity.format(asset.quantity)} {asset.unit}</td>
       <td className="px-5 py-4 whitespace-nowrap"><StatusBadge tone={tone}>{asset.status}</StatusBadge></td>
+      {/* The server refuses checks and requests for a disposed asset, so its row has no actions. */}
       {assetActions && <td className="px-5 py-4">{asset.status !== 'Бракуван' && assetActions(asset)}</td>}
     </tr>
   );
