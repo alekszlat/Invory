@@ -1,7 +1,10 @@
-﻿namespace Invory.Models.BDModels
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace Invory.Models.BDModels
 {
     public class WorkspaceInvitation
     {
+        [Key]
         public int Id { get; set; }
         public int WorkspaceId { get; set; }
         public string Token { get; set; } 

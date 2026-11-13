@@ -16,7 +16,6 @@ namespace Invory.Endpoints
     {
         public static void MapAssetsEndpoints(this IEndpointRouteBuilder app)
         {
-            // 1. Връща всички активи в регистъра (Само за администратори)
             app.MapGet("/registers/{registerId:int}/assets", async Task<IResult> (
                 int registerId, string? name, string? inventoryNumber, string? location,
                 int? quantity, string? custodian, DateTime? acquiredOn, string? unit,
@@ -48,52 +47,37 @@ namespace Invory.Endpoints
 
 
 
-            // 2. Връща активи от конкретен подрегистър (За членове)
             app.MapGet("/registers/{registerId:int}/subregisters/{subregisterId:int}/assets", async Task<IResult> (
                 int registerId, int subregisterId, string? name, string? inventoryNumber, string? location,
                 int? quantity, string? custodian, DateTime? acquiredOn, string? unit,
-                AssetStatus? assetStatus, string? sourceDocument, ClaimsPrincipal user,
+                AssetStatus? assetStatus, string? sourceDocument,
                 AppDbContext context, bool includeArchived = false, int page = 1, int pageSize = 20) =>
             {
-                if (!int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out int userId) || userId <= 0)
-                {
-                    return TypedResults.BadRequest("User ID is invalid or missing.");
-                }
 
-                bool workspaceExists = await context.WorkSpaces
-                    .AsNoTracking()
-                    .AnyAsync(w => w.Id == registerId);
 
-                if (!workspaceExists)
-                {
-                    return TypedResults.NotFound();
-                }
-
-                var assetsQuery = context.Assets
-                    .AsNoTracking()
-                    .Where(a => a.WorkspaceId == registerId &&
-                                a.SubWorkspaceId == subregisterId &&
-                                a.SubWorkspace.Users.Any(subWUser => subWUser.Id == userId));
-
+                var assetsQuery = context.Assets.AsNoTracking()
+           .Where(a => a.WorkspaceId == registerId && a.SubWorkspaceId == subregisterId);
 
                 var pagedResult = await EndpointsHelperStaticFunctions.GetPagedAssetsAsync(
                     assetsQuery, registerId, name, inventoryNumber, location, quantity,
                     custodian, acquiredOn, unit, assetStatus, sourceDocument,
                     includeArchived, page, pageSize);
 
-                
+
                 return TypedResults.Ok(pagedResult);
 
-            }).RequireAuthorization("WorkspaceMemberPolicy")
-              .WithDescription("Returns ONLY ASSETS DISTRIBUTED TO THIS SUB_WORKSPACE for NORMAL MEMBERS ONLY ");
+            })
+            .RequireAuthorization("SubWorkspaceMemberOrAdminPolicy") 
+            .WithDescription("Returns assets distributed to this sub-workspace - Only if User has access or is ADMIN");
+            //SubWorkspaceMemberOrAdminPolicy
 
 
 
-            // 3. Създаване на нов асет (Само за администратори)
             app.MapPost("/registers/{registerId:int}/assets", async Task<IResult> (
-                int registerId, AppDbContext dbContext, CreateAssetDto createAssetDto,ClaimsPrincipal user, IValidator<CreateAssetDto> validator) =>
+                int registerId, AppDbContext dbContext, CreateAssetDto createAssetDto,ClaimsPrincipal user, 
+                IValidator<CreateAssetDto> validator) =>
             {
-
+             
                 bool workspaceExists = await dbContext.WorkSpaces.AnyAsync(w => w.Id == registerId);
                 if (!workspaceExists)
                 {
@@ -123,7 +107,11 @@ namespace Invory.Endpoints
                     UpdatedAt = DateTime.UtcNow,
                     ArchivedAt = null
                 };
-                
+                string description = "Asset "+asset.Name+" with Inventory number "+asset.InventoryNumber+" was added";
+
+                await HistoryHelper.AddHistoryAsync(registerId, "Adding a new Asset", description, dbContext, user);
+
+
                 dbContext.Assets.Add(asset);
                await dbContext.SaveChangesAsync();
 
@@ -154,15 +142,28 @@ namespace Invory.Endpoints
               .WithDescription("For admins only, to create an asset");
 
 
-            // 4. Взимане на конкретен асет по ID (С проверка за достъп)
+ 
             app.MapGet("/registers/{registerId:int}/assets/{assetId:int}", async Task<IResult> (
-                int registerId, int assetId, AppDbContext dbContext, ClaimsPrincipal user) =>
+           int registerId, int assetId, AppDbContext dbContext, ClaimsPrincipal user) =>
             {
                 if (!int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out int userId) || userId <= 0)
                 {
                     return TypedResults.Unauthorized();
                 }
 
+            
+                var asset = await dbContext.Assets
+                    .AsNoTracking()
+                    .Where(a => a.Id == assetId && a.WorkspaceId == registerId)
+                    .Select(a => new { a.Id, a.SubWorkspaceId, a.WorkspaceId })
+                    .FirstOrDefaultAsync();
+
+                if (asset == null)
+                {
+                    return TypedResults.NotFound("Asset not found.");
+                }
+
+             
                 var connection = await dbContext.WorkspaceRoleUserTables
                     .Where(wu => wu.UserId == userId && wu.WorkspaceId == registerId)
                     .FirstOrDefaultAsync();
@@ -174,17 +175,14 @@ namespace Invory.Endpoints
 
                 if (connection.workspaceRole != WorkspaceRole.Admin)
                 {
-                    var subWp = await dbContext.SubWorkSpaces
-                        .Where(sWp => sWp.WorkspaceId == registerId && sWp.Assets.Any(a => a.Id == assetId))
-                        .FirstOrDefaultAsync();
-
-                    if (subWp == null)
+      
+                    if (asset.SubWorkspaceId == null)
                     {
-                        return TypedResults.NotFound();
+                        return TypedResults.Unauthorized();
                     }
 
                     bool hasSubAccess = await dbContext.SubWorkspaceRoleUserTables
-                        .AnyAsync(sWpMjdTablica => sWpMjdTablica.UserId == userId && sWpMjdTablica.SubWorkSpaceId == subWp.Id);
+                        .AnyAsync(sWpTab => sWpTab.UserId == userId && sWpTab.SubWorkSpaceId == asset.SubWorkspaceId.Value);
 
                     if (!hasSubAccess)
                     {
@@ -192,43 +190,45 @@ namespace Invory.Endpoints
                     }
                 }
 
+       
                 var assetDto = await dbContext.Assets
-            .AsNoTracking()
-            .Where(a => a.Id == assetId && a.WorkspaceId == registerId) 
-            .Select(ass => new AssetDtoPageDto(                        
-                Id: ass.Id,
-                RegisterId: registerId,
-                Name: ass.Name,
-                InventoryNumber: ass.InventoryNumber,
-                Location: ass.Location,
-                Custodian: ass.Custodian,
-                AcquiredOn: ass.AcquiredOn,
-                Unit: ass.Unit,
-                Quantity: ass.Quantity,
-                Status: ass.Status.ToString(),
-                SourceDocument: ass.SourceDocument,
-                ArchivedAt: ass.ArchivedAt,
-                Version: ass.Version,
-                CreatedAt: ass.CreatedAt,
-                UpdatedAt: ass.UpdatedAt
-            ))
-            .FirstOrDefaultAsync();
-
-                if (assetDto == null)
-                {
-                    return TypedResults.NotFound();
-                }
+                    .AsNoTracking()
+                    .Where(a => a.Id == assetId)
+                    .Select(ass => new AssetDtoPageDto(
+                        Id: ass.Id,
+                        RegisterId: registerId,
+                        Name: ass.Name,
+                        InventoryNumber: ass.InventoryNumber,
+                        Location: ass.Location,
+                        Custodian: ass.Custodian,
+                        AcquiredOn: ass.AcquiredOn,
+                        Unit: ass.Unit,
+                        Quantity: ass.Quantity,
+                        Status: ass.Status.ToString(),
+                        SourceDocument: ass.SourceDocument,
+                        ArchivedAt: ass.ArchivedAt,
+                        Version: ass.Version,
+                        CreatedAt: ass.CreatedAt,
+                        UpdatedAt: ass.UpdatedAt
+                    ))
+                    .FirstOrDefaultAsync();
 
                 return TypedResults.Ok(assetDto);
 
             }).RequireAuthorization()
-              .WithDescription("A person has access to an item if is an admin or part of a subworkspace containing the item");
+         .WithDescription("A person has access to an item if is an admin or part of the subworkspace containing the item");
 
 
-            // 5. Редактиране на асет (PATCH)
             app.MapPatch("/registers/{registerId:int}/assets/{assetId:int}", async Task<IResult> (
-                int registerId, int assetId, AppDbContext dbContext, UpdateAssetDto updateAssetDto) =>
+                int registerId, int assetId, AppDbContext dbContext, UpdateAssetDto updateAssetDto, IValidator<UpdateAssetDto> validator, ClaimsPrincipal user) =>
             {
+
+                var validationResult = await validator.ValidateAsync(updateAssetDto);
+                if (!validationResult.IsValid)
+                {
+                    return TypedResults.ValidationProblem(validationResult.ToDictionary());
+                }
+
                 var asset = await dbContext.Assets
                     .FirstOrDefaultAsync(ass => ass.Id == assetId && ass.WorkspaceId == registerId);
 
@@ -237,15 +237,72 @@ namespace Invory.Endpoints
                     return TypedResults.NotFound(new { error = "Asset not found" });
                 }
 
-                if (updateAssetDto.Name != null) asset.Name = updateAssetDto.Name;
-                if (updateAssetDto.InventoryNumber != null) asset.InventoryNumber = updateAssetDto.InventoryNumber;
-                if (updateAssetDto.Location != null) asset.Location = updateAssetDto.Location;
-                if (updateAssetDto.Quantity.HasValue) asset.Quantity = updateAssetDto.Quantity.Value;
-                if (updateAssetDto.Custodian != null) asset.Custodian = updateAssetDto.Custodian;
-                if (updateAssetDto.AcquiredOn.HasValue) asset.AcquiredOn = updateAssetDto.AcquiredOn.Value;
-                if (updateAssetDto.Unit != null) asset.Unit = updateAssetDto.Unit;
-                if (updateAssetDto.Status.HasValue) asset.Status = updateAssetDto.Status.Value;
-                if (updateAssetDto.SourceDocument != null) asset.SourceDocument = updateAssetDto.SourceDocument;
+                string description = $"Asset updated ({asset.Name}):\n";
+
+                if (updateAssetDto.Name != null && updateAssetDto.Name != asset.Name)
+                {
+                    description += $"- Name changed to '{updateAssetDto.Name}'\n";
+                    asset.Name = updateAssetDto.Name;
+                }
+
+                if (updateAssetDto.InventoryNumber != null && updateAssetDto.InventoryNumber != asset.InventoryNumber)
+                {
+                    description += $"- Inventory number changed to '{updateAssetDto.InventoryNumber}'\n";
+                    asset.InventoryNumber = updateAssetDto.InventoryNumber;
+                }
+
+                if (updateAssetDto.Location != null && updateAssetDto.Location != asset.Location)
+                {
+                    description += $"- Location changed to '{updateAssetDto.Location}'\n";
+                    asset.Location = updateAssetDto.Location;
+                }
+
+                if (updateAssetDto.Quantity.HasValue && updateAssetDto.Quantity.Value != asset.Quantity)
+                {
+                    description += $"- Quantity changed to {updateAssetDto.Quantity.Value}\n";
+                    asset.Quantity = updateAssetDto.Quantity.Value;
+                }
+
+                if (updateAssetDto.Custodian != null && updateAssetDto.Custodian != asset.Custodian)
+                {
+                    description += $"- Custodian changed to '{updateAssetDto.Custodian}'\n";
+                    asset.Custodian = updateAssetDto.Custodian;
+                }
+
+                if (updateAssetDto.AcquiredOn.HasValue && updateAssetDto.AcquiredOn.Value != asset.AcquiredOn)
+                {
+                    description += $"- Acquisition date changed to {updateAssetDto.AcquiredOn.Value:yyyy-MM-dd}\n";
+                    asset.AcquiredOn = updateAssetDto.AcquiredOn.Value;
+                }
+
+                if (updateAssetDto.Unit != null && updateAssetDto.Unit != asset.Unit)
+                {
+                    description += $"- Unit changed to '{updateAssetDto.Unit}'\n";
+                    asset.Unit = updateAssetDto.Unit;
+                }
+
+                if (updateAssetDto.Status.HasValue && updateAssetDto.Status.Value != asset.Status)
+                {
+                    description += $"- Status changed to {updateAssetDto.Status.Value}\n";
+                    asset.Status = updateAssetDto.Status.Value;
+                }
+
+                if (updateAssetDto.SourceDocument != null && updateAssetDto.SourceDocument != asset.SourceDocument)
+                {
+                    description += $"- Source document changed to '{updateAssetDto.SourceDocument}'\n";
+                    asset.SourceDocument = updateAssetDto.SourceDocument;
+                }
+
+                // Проверка дали реално има промяна преди да записваме в историята
+                if (description == $"Asset updated ({asset.Name}):\n")
+                {
+                    return TypedResults.BadRequest("No changes were provided for update.");
+                }
+
+                if (updateAssetDto.ExpectedVersion.HasValue && updateAssetDto.ExpectedVersion != asset.Version)
+                {
+                    return TypedResults.Conflict();
+                }
 
                 if (updateAssetDto.ExpectedVersion.HasValue && updateAssetDto.ExpectedVersion != asset.Version)
                 {
@@ -254,6 +311,9 @@ namespace Invory.Endpoints
 
                 asset.UpdatedAt = DateTime.UtcNow;
                 asset.Version += 1;
+
+                await HistoryHelper.AddHistoryAsync(registerId, "Edited a new Asset", description, dbContext, user);
+
 
                 await dbContext.SaveChangesAsync();
 
@@ -275,6 +335,7 @@ namespace Invory.Endpoints
                 UpdatedAt: asset.UpdatedAt
             );
 
+
                 return TypedResults.Ok(assetDto);
 
             }).RequireAuthorization("WorkspaceAdminPolicy");
@@ -282,7 +343,7 @@ namespace Invory.Endpoints
 
 
             app.MapDelete("/registers/{registerId:int}/assets/{assetId:int}", async Task<IResult> (
-                int registerId, int assetId, AppDbContext dbContext) =>
+                int registerId, int assetId, AppDbContext dbContext, ClaimsPrincipal user) =>
             {
                 var asset = await dbContext.Assets
                     .FirstOrDefaultAsync(ass => ass.Id == assetId && ass.WorkspaceId == registerId);
@@ -294,6 +355,9 @@ namespace Invory.Endpoints
 
                 asset.Status = AssetStatus.Archived;
                 asset.ArchivedAt = DateTime.UtcNow;
+
+                string description = "Archived asset with id"+asset.Id+" and name "+asset.Name;
+                await HistoryHelper.AddHistoryAsync(registerId, "Аrchived an asset", description, dbContext, user);
 
                 await dbContext.SaveChangesAsync();
                 var assetDto = new AssetDtoPageDto(
@@ -313,6 +377,7 @@ namespace Invory.Endpoints
                     CreatedAt: asset.CreatedAt,
                     UpdatedAt: asset.UpdatedAt
                 );
+
 
                 return TypedResults.Ok(assetDto);
 

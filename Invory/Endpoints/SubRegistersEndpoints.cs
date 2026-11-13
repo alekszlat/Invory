@@ -1,10 +1,15 @@
-﻿using Invory.Db;
+﻿using FluentValidation;
+using Invory.Db;
 using Invory.DTO;
+using Invory.HelperClasses;
 using Invory.Models.BDModels;
 using Invory.Models.enums;
+using Invory.Validators;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Org.BouncyCastle.Bcpg;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
 namespace Invory.Endpoints
@@ -14,9 +19,19 @@ namespace Invory.Endpoints
 
         public static void MapSubRegistersEndpoints(this IEndpointRouteBuilder app)
         {
-            //POST /registers/{registerId}/subregisters
-            app.MapPost("/registers/{registerId:int}/subregisters", async Task<IResult> (int registerId, AppDbContext dbContext, string name) =>
+            app.MapPost("/registers/{registerId:int}/subregisters", async Task<IResult> (int registerId, AppDbContext dbContext, string name, ClaimsPrincipal userPr) =>
             {
+
+                Int32.TryParse(userPr.FindFirstValue(ClaimTypes.NameIdentifier), out int userId);
+                if (name.IsWhiteSpace()) 
+                {
+                    return TypedResults.BadRequest("SubWorkspace name is required");
+                 
+                }
+                if (name.Count() > 100)
+                {
+                    return TypedResults.BadRequest("SubWorkspace name must not exceed 100 characters.");
+                }
                 SubWorkSpace subWorkspace = new SubWorkSpace();
                 subWorkspace.SubWorkspaceName = name;
                 subWorkspace.WorkspaceId = registerId;
@@ -29,29 +44,32 @@ namespace Invory.Endpoints
                 }
 
                 dbContext.SubWorkSpaces.Add(subWorkspace);
+
+
+                await HistoryHelper.AddHistoryAsync(registerId, "Created a new Sub Workspace", "Created sub-workspace: "+ name, dbContext, userPr);
+
+
                 await dbContext.SaveChangesAsync();
 
                 CreatedSubWorkspaceDTO subRegisterDTo = new CreatedSubWorkspaceDTO(subWorkspace.Id, subWorkspace.SubWorkspaceName, registerId);
+
                 return TypedResults.Ok(subRegisterDTo);
 
             }).RequireAuthorization("WorkspaceAdminPolicy").WithDescription("Create a subRegister -ADMIN ONLY");
             //EditSubWorkspaceDto
+
+
             app.MapGet("/registers/{registerId:int}/subregisters", async Task<IResult> (
-int registerId,
-AppDbContext dbContext,
-ClaimsPrincipal userPr
-) =>
+            int registerId,
+            AppDbContext dbContext,
+            ClaimsPrincipal userPr
+            ) =>
             {
                 if (!int.TryParse(userPr.FindFirstValue(ClaimTypes.NameIdentifier), out int userId) || userId <= 0)
                 {
                     return TypedResults.BadRequest("User ID is invalid or missing.");
                 }
 
-                bool userExists = await dbContext.Users.AnyAsync(user => user.Id == userId);
-                if (!userExists)
-                {
-                    return TypedResults.BadRequest("User not found.");
-                }
 
                 var connection = await dbContext.WorkspaceRoleUserTables
                     .AsNoTracking()
@@ -73,6 +91,7 @@ ClaimsPrincipal userPr
                     query = query.Where(sb => sb.Users.Any(us => us.Id == userId));
                 }
 
+
                 var result = await query
           .Select(sb => new CreatedSubWorkspaceDto(
                   sb.Id,
@@ -84,8 +103,9 @@ ClaimsPrincipal userPr
           .ToListAsync();
                 return TypedResults.Ok(result);
             })
-        .RequireAuthorization()
+        .RequireAuthorization("WorkspaceMemberPolicy")
         .WithDescription("Returns all subregisters for Workspace Admins, or only the ones the user participates in for Members.");
+
 
 
 
@@ -93,9 +113,17 @@ ClaimsPrincipal userPr
                  int registerId,
                  int subregisterId,
                  AppDbContext dbContext,
-                 [FromBody] UpdateSubWorkspaceDto dto
+                 [FromBody] UpdateSubWorkspaceDto dto,IValidator<UpdateSubWorkspaceDto> validator, ClaimsPrincipal userPr
              ) =>
             {
+
+                string description = "";
+
+                var validationResult = await validator.ValidateAsync(dto);
+                if (!validationResult.IsValid)
+                {
+                    return TypedResults.ValidationProblem(validationResult.ToDictionary());
+                }
                 if (!string.IsNullOrWhiteSpace(dto.Name))
                 {
                     bool nameExists = await dbContext.SubWorkSpaces
@@ -115,13 +143,13 @@ ClaimsPrincipal userPr
                     return TypedResults.NotFound("SubWorkspace not found or does not belong to this register.");
                 }
 
-                bool hasChanges = false;
 
-               
-                
+                if (!string.IsNullOrWhiteSpace(dto.Name))
+                {
+                    description += "Changed subWorkspace name from " + subRegister.SubWorkspaceName + " to "+dto.Name+"\n";
+
                     subRegister.SubWorkspaceName = dto.Name;
-                    hasChanges = true;
-                
+                }
 
                 if (dto.AssetIds != null && dto.AssetIds.Any())
                 {
@@ -133,19 +161,25 @@ ClaimsPrincipal userPr
                     {
                         return TypedResults.BadRequest("Not all assets belong to this workspace.");
                     }
+                    description += "Adding assets with ID's ";
 
                     foreach (var asset in assetsToAssign)
                     {
+                        description += asset.Id + " ";
                         asset.SubWorkspaceId = subregisterId;
                     }
 
-                    hasChanges = true;
+                  
                 }
 
-                if (!hasChanges)
+                if (string.IsNullOrWhiteSpace(description))
                 {
                     return TypedResults.BadRequest("No valid data provided for update or assignment.");
                 }
+
+
+                await HistoryHelper.AddHistoryAsync(registerId,"Edited a subWorkspace", description, dbContext, userPr);
+
 
                 await dbContext.SaveChangesAsync();
 

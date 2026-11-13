@@ -76,6 +76,20 @@
             return MakeToken(claims);
 
         }
+        public TokenExpDate CreateSubWorkspaceInvitationToken(int workspaceId,int subWorkspaceId,SubWorkspaceRoles role)
+        {
+            //Данните за нашия токен
+            List<Claim> claims = new List<Claim>
+            {
+               new Claim("WorkspaceId", workspaceId.ToString()),
+               new Claim("SubWorkspaceId", subWorkspaceId.ToString()),
+               new Claim("WorkspaceRole", role.ToString()),
+            };
+
+
+            return MakeToken(claims);
+
+        }
 
 
 

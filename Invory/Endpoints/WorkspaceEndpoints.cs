@@ -6,18 +6,20 @@ using Invory.Models.BDModels;
 using Invory.Models.enums;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.Win32;
+using Org.BouncyCastle.Utilities.Collections;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
-
 namespace Invory.Endpoints
 {
     public static class WorkspaceEndpoints
     {
         public static void MapWorkspaceEndpoints(this IEndpointRouteBuilder app)
         {
-            // 1. Взимане на детайли за конкретен регистър (Изисква да си член)
             app.MapGet("/registers/{registerId:int}", async Task<Results<NotFound, Ok<WorkspacePageDto>>> (
                 int registerId,
                 AppDbContext dbContext,
@@ -123,7 +125,6 @@ namespace Invory.Endpoints
                 var validationResult = await validator.ValidateAsync(workspaceDto);
                 if (!validationResult.IsValid)
                 {
-
                     return TypedResults.ValidationProblem(validationResult.ToDictionary());
                 }
                 var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -162,12 +163,18 @@ namespace Invory.Endpoints
 
       
 
-            app.MapPatch("/registers/{registerId:int}", async Task<Results<NotFound, BadRequest<string>, Ok<WorkspaceMainPage>>> (
+            app.MapPatch("/registers/{registerId:int}", async Task<Results<NotFound,ValidationProblem,BadRequest<string>, Ok<WorkspaceMainPage>>> (
                 int registerId,
                 UpdateRegisterDto dto,
                 AppDbContext dbContext,
-                ClaimsPrincipal user) =>
+                ClaimsPrincipal user, IValidator<UpdateRegisterDto> validator) =>
             {
+
+                var validationResult = await validator.ValidateAsync(dto);
+                if (!validationResult.IsValid)
+                {
+                    return TypedResults.ValidationProblem(validationResult.ToDictionary());
+                }
                 var workspace = await dbContext.WorkSpaces
                     .Include(w => w.WorkspaceRUTable)
                     .FirstOrDefaultAsync(w => w.Id == registerId);
@@ -177,7 +184,6 @@ namespace Invory.Endpoints
                     return TypedResults.NotFound();
                 }
 
-                // Частична актуализация (PATCH)
                 if (!string.IsNullOrWhiteSpace(dto.WorkspaceName))
                 {
                     workspace.WorkspaceName = dto.WorkspaceName;
@@ -208,9 +214,58 @@ namespace Invory.Endpoints
 
 
 
+            app.MapGet("/registers/{registerId:int}", async Task<IResult> 
+                (int registerId,AppDbContext dbContext,int page=1,int pageSize=20) =>
+            {
+                var history = dbContext.WorkspaceHistory.Where(wp => wp.WorkspaceId == registerId);
+                int count = await history.CountAsync();
+                int totalPages;
+                int skip;
+               
+               PaginationMetaDto pgDto= PaginationCalculator.CalculateMeta(count, out totalPages,out skip, ref page, ref pageSize);
 
 
-          
+                var result = await history.OrderByDescending(history => history.Id).Skip(skip).Take(pageSize).Select(history => 
+                new HistoryDto(history.Id, history.Title, history.Description,
+               new UserDto(history.UserId, history.UserUsername, history.UserEmail))).ToListAsync();
+                //PagedResultDto
+                PagedResultDto<HistoryDto> pagedResult = new PagedResultDto<HistoryDto>(result, pgDto);
+
+                return TypedResults.Ok(pagedResult);
+
+            }).RequireAuthorization("WorkspaceMemberPolicy").WithDescription("This Workspace's history with pages");
+
+
+            //GET /registers/{registerId}/subregisters/{subregisterId}/memberships
+
+
+            app.MapGet("/registers/{registerId:int}", async Task<IResult>
+                (int registerId, AppDbContext dbContext, ClaimsPrincipal user, int page = 1, int pageSize = 20) =>
+            {
+
+                var users = dbContext.Users.Where(users => users.Workspaces.Any(wp => wp.Id == registerId));
+
+                int count = await users.CountAsync();
+
+                int totalPages;
+                int skip;
+
+                PaginationMetaDto pgDto = PaginationCalculator.CalculateMeta(count, out totalPages, out skip, ref page, ref pageSize);
+
+
+                var result = await users.OrderBy(u => u.Id).Skip(skip).Take(pageSize).Select(u => new UserDto(u.Id, u.UserName, u.Email)).ToListAsync();
+
+
+
+
+                PagedResultDto<List<UserDto>> pagedResult = new PagedResultDto<HistoryDto>(result, pgDto);
+
+                return TypedResults.Ok(pagedResult);
+
+
+            }).RequireAuthorization("WorkspaceMemberPolicy").WithDescription("C"); 
+
+
         }
     }
 }

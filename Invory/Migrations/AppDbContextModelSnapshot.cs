@@ -126,6 +126,46 @@ namespace Invory.Migrations
                     b.ToTable("Assets");
                 });
 
+            modelBuilder.Entity("Invory.Models.BDModels.History", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserEmail")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserUsername")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("WorkspaceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId");
+
+                    b.ToTable("WorkspaceHistory");
+                });
+
             modelBuilder.Entity("Invory.Models.BDModels.SubWorkSpace", b =>
                 {
                     b.Property<int>("Id")
@@ -280,6 +320,11 @@ namespace Invory.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("InvitationType")
+                        .IsRequired()
+                        .HasMaxLength(34)
+                        .HasColumnType("nvarchar(34)");
+
                     b.Property<DateTime>("InvokedAt")
                         .HasColumnType("datetime2");
 
@@ -296,6 +341,10 @@ namespace Invory.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("WorkspaceInvitations");
+
+                    b.HasDiscriminator<string>("InvitationType").HasValue("WorkspaceInvitation");
+
+                    b.UseTphMappingStrategy();
                 });
 
             modelBuilder.Entity("Invory.Models.BDModels.WorkspaceRoleUserTable", b =>
@@ -450,6 +499,20 @@ namespace Invory.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Invory.Models.SubWorkspaceInvitation", b =>
+                {
+                    b.HasBaseType("Invory.Models.BDModels.WorkspaceInvitation");
+
+                    b.Property<string>("InvitedAsRole")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SubWorkspaceId")
+                        .HasColumnType("int");
+
+                    b.HasDiscriminator().HasValue("SubWorkspaceInvitation");
+                });
+
             modelBuilder.Entity("Invory.HelperClasses.RefreshToken", b =>
                 {
                     b.HasOne("Invory.Models.BDModels.User", "User")
@@ -474,6 +537,17 @@ namespace Invory.Migrations
                         .IsRequired();
 
                     b.Navigation("SubWorkspace");
+
+                    b.Navigation("Workspace");
+                });
+
+            modelBuilder.Entity("Invory.Models.BDModels.History", b =>
+                {
+                    b.HasOne("Invory.Models.BDModels.WorkSpace", "Workspace")
+                        .WithMany("History")
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Workspace");
                 });
@@ -591,6 +665,8 @@ namespace Invory.Migrations
             modelBuilder.Entity("Invory.Models.BDModels.WorkSpace", b =>
                 {
                     b.Navigation("Assets");
+
+                    b.Navigation("History");
 
                     b.Navigation("SubWorkSpaces");
 

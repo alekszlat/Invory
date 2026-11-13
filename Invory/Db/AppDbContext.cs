@@ -1,4 +1,5 @@
 ﻿using Invory.HelperClasses;
+using Invory.Models;
 using Invory.Models.BDModels;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -17,8 +18,9 @@ namespace Invory.Db
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<SubWorkspaceRoleUserTable> SubWorkspaceRoleUserTables { get; set; }
         public DbSet<WorkspaceInvitation> WorkspaceInvitations { get; set; }
+        public DbSet<SubWorkspaceInvitation> SubWorkspaceInvitations { get; set; }
 
-
+        public DbSet<History> WorkspaceHistory { get; set; }
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
 
 
@@ -87,7 +89,14 @@ namespace Invory.Db
                 entity.HasCheckConstraint("CK_User_UserName_MinLength", "LEN(UserName) >= 6");
             });
 
-            
+
+            modelBuilder.Entity<WorkspaceInvitation>()
+        .HasDiscriminator<string>("InvitationType") 
+        .HasValue<WorkspaceInvitation>("WorkspaceInvitation")
+        .HasValue<SubWorkspaceInvitation>("SubWorkspaceInvitation");
+
+            modelBuilder.Entity<SubWorkspaceInvitation>().Property(w=>w.InvitedAsRole).HasConversion<string>(); 
+
         }
     }
 }

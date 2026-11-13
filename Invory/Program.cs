@@ -69,12 +69,25 @@ builder.Services.AddAuthorization(options =>
         policy.Requirements.Add(new WorkspaceMemberRequirement()));
 
     options.AddPolicy("WorkspaceAdminPolicy", policy =>
+
         policy.Requirements.Add(new WorkspaceAdminRequirement()));
+    options.AddPolicy("SubWorkspaceMemberOrAdminPolicy", policy =>
+        policy.Requirements.Add(new SubWorkspaceMemberOrAdminRequirement()));
+
+    options.AddPolicy("SubWorkspaceContributorPolicy", policy =>
+        policy.Requirements.Add(new SubWorkspaceContributorRequirement()));
+
+    options.AddPolicy("SubWorkspaceContributorOrAdminPolicy", policy =>
+        policy.Requirements.Add(new SubWorkspaceContributorOrAdminRequirement()));
 });
 
 // Регистрираме хендлърите в DI контейнера
 builder.Services.AddScoped<IAuthorizationHandler, WorkspaceMemberHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, WorkspaceAdminHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, SubWorkspaceMemberOrAdminCheck>();
+builder.Services.AddScoped<IAuthorizationHandler, SubWorkspaceContributorOrAdminCheck>();
+builder.Services.AddScoped<IAuthorizationHandler, SubWorkspaceContributorCheck>();
+
 
 // 5. CORS Policy (Конфигуриран за работа с HttpOnly бисквитки за рефреш токени)
 builder.Services.AddCors(options =>

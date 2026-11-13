@@ -22,6 +22,7 @@ namespace Invory.Models.BDModels
    
         public List<WorkspaceRoleUserTable> WorkspaceRUTable { get; set; } = new();
         public List<User> Users { get; set; } = new();
+        public List<History> History { get; set; } = new();
         public List<Asset> Assets { get; set; } = new();
         public List<SubWorkSpace> SubWorkSpaces { get; set; } = new();
     }
