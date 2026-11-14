@@ -95,7 +95,8 @@ namespace Invory.Db
         .HasValue<WorkspaceInvitation>("WorkspaceInvitation")
         .HasValue<SubWorkspaceInvitation>("SubWorkspaceInvitation");
 
-            modelBuilder.Entity<SubWorkspaceInvitation>().Property(w=>w.InvitedAsRole).HasConversion<string>(); 
+            modelBuilder.Entity<SubWorkspaceInvitation>().Property(w=>w.InvitedAsRole).HasConversion<string>();
+            modelBuilder.Entity<ChangeRequest>().Property(cR=>cR.Status).HasConversion<string>();
 
         }
     }

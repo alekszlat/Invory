@@ -108,7 +108,6 @@ namespace Invory.Endpoints
 
                     dbContext.WorkspaceRoleUserTables.Add(workspaceConnection);
 
-                    invitation.IsUsed = true;
                     invitation.InvokedAt = DateTime.UtcNow;
                     string username = await dbContext.Users.Where(us => us.Id == userId).Select(us=>us.UserName).FirstOrDefaultAsync();
                     string description= username+" has joined the workspace";

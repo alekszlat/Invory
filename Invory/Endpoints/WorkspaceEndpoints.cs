@@ -239,33 +239,76 @@ namespace Invory.Endpoints
             //GET /registers/{registerId}/subregisters/{subregisterId}/memberships
 
 
-            app.MapGet("/registers/{registerId:int}", async Task<IResult>
-                (int registerId, AppDbContext dbContext, ClaimsPrincipal user, int page = 1, int pageSize = 20) =>
+
+
+            app.MapGet("/registers/{registerId:int}/memberships", async Task<IResult> (
+      int registerId,
+      AppDbContext dbContext,
+      ClaimsPrincipal user,int page = 1,int pageSize = 20) =>
             {
+                var query = dbContext.WorkspaceRoleUserTables
+                    .Where(s => s.WorkspaceId == registerId)
+                    .Include(s => s.User);
 
-                var users = dbContext.Users.Where(users => users.Workspaces.Any(wp => wp.Id == registerId));
-
-                int count = await users.CountAsync();
+                int count = await query.CountAsync();
 
                 int totalPages;
                 int skip;
 
                 PaginationMetaDto pgDto = PaginationCalculator.CalculateMeta(count, out totalPages, out skip, ref page, ref pageSize);
 
+                var result = await query
+                    .OrderBy(s => s.UserId)
+                    .Skip(skip)
+                    .Take(pageSize)
+                    .Select(s => new WorkspaceMembershipDto(
+                        new UserDto(s.UserId, s.User.UserName,s.User.Email),
+                        s.workspaceRole
+                    ))
+                    .ToListAsync();
 
-                var result = await users.OrderBy(u => u.Id).Skip(skip).Take(pageSize).Select(u => new UserDto(u.Id, u.UserName, u.Email)).ToListAsync();
-
-
-
-
-                PagedResultDto<List<UserDto>> pagedResult = new PagedResultDto<HistoryDto>(result, pgDto);
+                PagedResultDto<WorkspaceMembershipDto> pagedResult = new PagedResultDto<WorkspaceMembershipDto>(result, pgDto);
 
                 return TypedResults.Ok(pagedResult);
+            })
+  .RequireAuthorization("WorkspaceMemberPolicy")
+  .WithDescription("Get memberships in a certain workspace with pages");
 
 
-            }).RequireAuthorization("WorkspaceMemberPolicy").WithDescription("C"); 
+            app.MapGet("/registers/{registerId:int}/subregisters/{subregisterId:int}/memberships", async Task<IResult> (
+            int registerId,
+            int subregisterId,
+            AppDbContext dbContext, int page = 1, int pageSize = 20) =>
+            {
 
+                var query = dbContext.SubWorkspaceRoleUserTables
+                        .Where(s => s.SubWorkSpaceId == subregisterId)
+                        .Include(s => s.User);
 
+                int count = await query.CountAsync();
+                int totalPages;
+                int skip;
+
+                PaginationMetaDto pgDto = PaginationCalculator.CalculateMeta(count, out totalPages, out skip, ref page, ref pageSize);
+
+                            var result = await query
+                       .OrderBy(s => s.UserId)
+                       .Skip(skip)
+                       .Take(pageSize)
+                       .Select(s => new SubWorkspaceMembershipDto(
+                           new UserDto(s.UserId,
+                           s.User.UserName,
+                           s.User.Email),
+                           s.subWorkspaceRole
+                       ))
+                       .ToListAsync();
+
+                PagedResultDto<SubWorkspaceMembershipDto> pagedResult = new PagedResultDto<SubWorkspaceMembershipDto>(result, pgDto);
+
+                return TypedResults.Ok(pagedResult);
+            }).RequireAuthorization("SubWorkspaceMemberOrAdminPolicy").WithDescription("Get memberships in a certain sub-workspace with pages");
+         
+            
         }
     }
 }

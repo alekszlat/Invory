@@ -1,6 +1,4 @@
 ﻿namespace Invory.DTO
 {
-    public class HistoryDto
-    {
-    }
+    public record HistoryDto(int id, string title, string description, UserDto userDto);
 }
