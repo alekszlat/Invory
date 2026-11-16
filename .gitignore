@@ -1,7 +1,7 @@
 # React dependencies and build output
 node_modules/
-/frontend/dist/
-/frontend/coverage/
+frontend/dist/
+frontend/coverage/
 
 # .NET build and test output
 bin/
@@ -22,3 +22,8 @@ TestResults/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Agent specific files
+*.agents
+AGENTS.md
+*.claude
