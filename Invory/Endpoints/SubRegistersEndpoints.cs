@@ -20,7 +20,7 @@ namespace Invory.Endpoints
 
         public static void MapSubRegistersEndpoints(this IEndpointRouteBuilder app)
         {
-            app.MapPost("/registers/{registerId:int}/subregisters", async Task<IResult> (int registerId, AppDbContext dbContext, string name, ClaimsPrincipal userPr) =>
+            app.MapPost("/registers/{registerId:int}/subregisters", async Task<Results<Ok<CreatedSubWorkspaceDTO>, BadRequest<string>>> (int registerId, AppDbContext dbContext, string name, ClaimsPrincipal userPr) =>
             {
 
                 Int32.TryParse(userPr.FindFirstValue(ClaimTypes.NameIdentifier), out int userId);
@@ -60,7 +60,7 @@ namespace Invory.Endpoints
             //EditSubWorkspaceDto
 
 
-            app.MapGet("/registers/{registerId:int}/subregisters", async Task<IResult> (
+            app.MapGet("/registers/{registerId:int}/subregisters", async Task<Results<Ok<List<CreatedSubWorkspaceDto>>, BadRequest<string>, ForbidHttpResult>> (
             int registerId,
             AppDbContext dbContext,
             ClaimsPrincipal userPr
@@ -110,7 +110,7 @@ namespace Invory.Endpoints
 
 
 
-            app.MapPatch("/registers/{registerId:int}/subregisters/{subregisterId:int}", async Task<IResult> (
+            app.MapPatch("/registers/{registerId:int}/subregisters/{subregisterId:int}", async Task<Results<Ok<string>, BadRequest<string>, NotFound<string>,ValidationProblem>> (
                  int registerId,
                  int subregisterId,
                  AppDbContext dbContext,
@@ -184,16 +184,13 @@ namespace Invory.Endpoints
 
                 await dbContext.SaveChangesAsync();
 
-                return TypedResults.Ok(new
-                {
-                    Message = "Sub-workspace updated and assets assigned successfully!"
-                });
+                return TypedResults.Ok("Sub-workspace updated and assets assigned successfully!");
             }).RequireAuthorization("WorkspaceAdminPolicy")
              .WithDescription("Update subWorkspace name and/or assign assets - ADMIN ONLY");
 
 
 
-            app.MapGet("/requests", async Task<IResult> (
+            app.MapGet("/requests", async Task<Results<Ok<PagedResultDto<ChangeRequestResponseDto>>, BadRequest<string>, NotFound>> (
            int? registerId,
            int? subregisterId,
            ChangeRequestStatus? status,
@@ -216,6 +213,7 @@ namespace Invory.Endpoints
                 //Change request by us or ones we are admin of
                 var query = dbContext.ChangeRequests
                     .Where(cr => cr.RequestedById == userId || adminWorkspaceIds.Contains(cr.WorkspaceId));
+                
 
                 //if register id is not null we get ones from this Workspace only
                 if (registerId.HasValue)
@@ -229,12 +227,17 @@ namespace Invory.Endpoints
                 {
                     query = query.Where(cr => cr.SubWorkspaceId == subregisterId.Value);
                 }
+            
                 //if searching by status
                 if (status.HasValue)
                 {
                     query = query.Where(cr => cr.Status == status);
                 }
 
+                if (query == null)
+                {
+                    return TypedResults.NotFound();
+                }
                 int count = await query.CountAsync();
                 int totalPages;
                 int skip;
@@ -272,10 +275,10 @@ namespace Invory.Endpoints
        .WithDescription("Get list of Requests, his and other, with workspaceId , subWorkspace ,id and status, being optional");
 
 
-            app.MapPost("/registers/{registerId:int}/subregisters/{subregisterId:int}/changerequests/AssetId", async Task<IResult> (
+            app.MapPost("/registers/{registerId:int}/subregisters/{subregisterId:int}/changerequests/{AssetId:int}", async Task<Results<Ok<string>, BadRequest<string>, NotFound<string>>> (
                 int AssetId,
                 int registerId,
-                 ChangeRequestKind ChangeReuestType,
+                ChangeRequestKind ChangeReuestType,
                 int subregisterId,
                 CreateChangeRequestDto dto,
                 ClaimsPrincipal currentUser,
@@ -313,7 +316,7 @@ namespace Invory.Endpoints
                     cr.WorkspaceId == registerId &&
                     cr.SubWorkspaceId == subregisterId &&
                     cr.AssetId == AssetId &&
-                    cr.ChangeReuestType == ChangeReuestType &&
+                    cr.ChangeReuestType == ChangeReuestType && //трябва даа го махна ако няма значение типа, а просто искам за един асет една зявка
                     cr.Status == ChangeRequestStatus.pending
                 );
 
@@ -372,7 +375,7 @@ namespace Invory.Endpoints
 
                 await dbContext.SaveChangesAsync();
 
-                return TypedResults.Ok(new { Message = "Change request created successfully!", changeRequest.Id });
+                return TypedResults.Ok("Change request created successfully! ID:"+ changeRequest.Id );
             })
             .RequireAuthorization("SubWorkspaceContributorOrAdminPolicy")
             .WithDescription("Create a new change request for an asset.");

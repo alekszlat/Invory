@@ -8,7 +8,6 @@ namespace Invory.DTO
         int? SubregisterId,
         string Name,
         string InventoryNumber,
-        
         string Location,
         string? Custodian,
         DateTime? AcquiredOn, 

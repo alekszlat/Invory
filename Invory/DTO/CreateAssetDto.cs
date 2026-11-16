@@ -5,6 +5,7 @@ namespace Invory.DTO
     public record CreateAssetDto(
        string Name,
        string InventoryNumber,
+       int WorkspaceId,
        string Location,
        decimal Quantity,
        string? Custodian,

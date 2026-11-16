@@ -16,7 +16,7 @@ namespace Invory.Endpoints
     {
         public static void MapAssetsEndpoints(this IEndpointRouteBuilder app)
         {
-            app.MapGet("/registers/{registerId:int}/assets", async Task<IResult> (
+            app.MapGet("/registers/{registerId:int}/assets", async Task<Results<Ok<PagedResultDto<AssetDtoPageDto>>, BadRequest<string>>> (
                 int registerId, string? name, string? inventoryNumber, string? location,
                 int? quantity, string? custodian, DateTime? acquiredOn, string? unit,
                 AssetStatus? assetStatus, string? sourceDocument, ClaimsPrincipal user,
@@ -73,7 +73,7 @@ namespace Invory.Endpoints
 
 
 
-            app.MapPost("/registers/{registerId:int}/assets", async Task<IResult> (
+            app.MapPost("/registers/{registerId:int}/assets", async Task<Results<Created<AssetDtoPageDto>, BadRequest<string>, ValidationProblem>> (
                 int registerId, AppDbContext dbContext, CreateAssetDto createAssetDto,ClaimsPrincipal user, 
                 IValidator<CreateAssetDto> validator) =>
             {
@@ -89,6 +89,7 @@ namespace Invory.Endpoints
                 
                     return TypedResults.ValidationProblem(validationResult.ToDictionary());
                 }
+                
 
                 Asset asset = new Asset
                 {
@@ -113,6 +114,7 @@ namespace Invory.Endpoints
 
 
                 dbContext.Assets.Add(asset);
+        
                await dbContext.SaveChangesAsync();
 
                 var assetDto = await dbContext.Assets
@@ -143,7 +145,7 @@ namespace Invory.Endpoints
 
 
  
-            app.MapGet("/registers/{registerId:int}/assets/{assetId:int}", async Task<IResult> (
+            app.MapGet("/registers/{registerId:int}/assets/{assetId:int}", async Task<Results<Ok<AssetDtoPageDto>, UnauthorizedHttpResult, NotFound<string>>> (
            int registerId, int assetId, AppDbContext dbContext, ClaimsPrincipal user) =>
             {
                 if (!int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out int userId) || userId <= 0)
@@ -220,7 +222,7 @@ namespace Invory.Endpoints
          .WithDescription("A person has access to an item if is an admin or part of the subworkspace containing the item");
 
 
-            app.MapPatch("/registers/{registerId:int}/assets/{assetId:int}", async Task<IResult> (
+            app.MapPatch("/registers/{registerId:int}/assets/{assetId:int}", async Task<Results<Ok<AssetDtoPageDto>, BadRequest<string>, NotFound, Conflict,ValidationProblem>> (
                 int registerId, int assetId, AppDbContext dbContext, UpdateAssetDto updateAssetDto, IValidator<UpdateAssetDto> validator, ClaimsPrincipal user) =>
             {
 
@@ -235,7 +237,7 @@ namespace Invory.Endpoints
 
                 if (asset == null)
                 {
-                    return TypedResults.NotFound(new { error = "Asset not found" });
+                    return TypedResults.NotFound();
                 }
 
                 string description = $"Asset updated ({asset.Name}):\n";
@@ -343,7 +345,7 @@ namespace Invory.Endpoints
 
 
 
-            app.MapDelete("/registers/{registerId:int}/assets/{assetId:int}", async Task<IResult> (
+            app.MapDelete("/registers/{registerId:int}/assets/{assetId:int}", async Task<Results<Ok<AssetDtoPageDto>, NotFound>> (
                 int registerId, int assetId, AppDbContext dbContext, ClaimsPrincipal user) =>
             {
                 var asset = await dbContext.Assets

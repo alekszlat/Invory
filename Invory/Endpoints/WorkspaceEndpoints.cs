@@ -65,7 +65,7 @@ namespace Invory.Endpoints
 
                 return TypedResults.Ok(dto);
             })
-            .RequireAuthorization("WorkspaceMemberPolicy"); // Само членове на уъркспейса
+            .RequireAuthorization("WorkspaceMemberPolicy").WithDescription("Returns a workspace if user is a member"); // Само членове на уъркспейса
 
 
             app.MapGet("/registers", async Task<Results<NotFound, Ok<PagedResultDto<WorkspaceMainPage>>>> (
@@ -214,7 +214,7 @@ namespace Invory.Endpoints
 
 
 
-            app.MapGet("/registers/{registerId:int}", async Task<IResult> 
+            app.MapGet("/registers/history/{registerId:int}", async Task<IResult> 
                 (int registerId,AppDbContext dbContext,int page=1,int pageSize=20) =>
             {
                 var history = dbContext.WorkspaceHistory.Where(wp => wp.WorkspaceId == registerId);
