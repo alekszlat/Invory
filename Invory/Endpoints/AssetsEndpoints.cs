@@ -117,10 +117,11 @@ namespace Invory.Endpoints
 
                 var assetDto = await dbContext.Assets
                 .AsNoTracking()
-                .Where(ass => ass.Id == asset.Id) 
+                .Where(ass => ass.Id == asset.Id)
                 .Select(ass => new AssetDtoPageDto(
                     Id: ass.Id,
                     RegisterId: registerId,
+                    SubregisterId: ass.SubWorkspaceId,
                     Name: ass.Name,
                     InventoryNumber: ass.InventoryNumber,
                     Location: ass.Location,
@@ -134,8 +135,7 @@ namespace Invory.Endpoints
                     Version: ass.Version,
                     CreatedAt: ass.CreatedAt,
                     UpdatedAt: ass.UpdatedAt
-                ))
-                .FirstOrDefaultAsync();
+                )).FirstOrDefaultAsync();
                 return TypedResults.Created($"/registers/{registerId}/assets/{asset.Id}", assetDto);
 
             }).RequireAuthorization("WorkspaceAdminPolicy")
@@ -197,6 +197,7 @@ namespace Invory.Endpoints
                     .Select(ass => new AssetDtoPageDto(
                         Id: ass.Id,
                         RegisterId: registerId,
+                        SubregisterId:ass.SubWorkspaceId,
                         Name: ass.Name,
                         InventoryNumber: ass.InventoryNumber,
                         Location: ass.Location,
@@ -293,7 +294,6 @@ namespace Invory.Endpoints
                     asset.SourceDocument = updateAssetDto.SourceDocument;
                 }
 
-                // Проверка дали реално има промяна преди да записваме в историята
                 if (description == $"Asset updated ({asset.Name}):\n")
                 {
                     return TypedResults.BadRequest("No changes were provided for update.");
@@ -320,6 +320,7 @@ namespace Invory.Endpoints
                 var assetDto = new AssetDtoPageDto(
                 Id: asset.Id,
                 RegisterId: registerId,
+                SubregisterId:asset.SubWorkspaceId,
                 Name: asset.Name,
                 InventoryNumber: asset.InventoryNumber,
                 Location: asset.Location,
@@ -362,7 +363,8 @@ namespace Invory.Endpoints
                 await dbContext.SaveChangesAsync();
                 var assetDto = new AssetDtoPageDto(
                     Id: asset.Id,
-                    RegisterId: registerId,
+                    RegisterId: registerId,SubregisterId:
+                    asset.SubWorkspaceId,
                     Name: asset.Name,
                     InventoryNumber: asset.InventoryNumber,
                     Location: asset.Location,

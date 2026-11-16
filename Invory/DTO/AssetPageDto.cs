@@ -5,8 +5,10 @@ namespace Invory.DTO
     public record AssetDtoPageDto(
         int Id,
         int RegisterId,
+        int? SubregisterId,
         string Name,
         string InventoryNumber,
+        
         string Location,
         string? Custodian,
         DateTime? AcquiredOn, 

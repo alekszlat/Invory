@@ -147,7 +147,7 @@ app.UseAuthorization();
 var apiV1Group = app.MapGroup("/api/v1");
 // Map Endpoints
 apiV1Group.MapAuthenticationEndpoints();
-//apiV1Group.MapWorkspaceEndpoints();
+apiV1Group.MapWorkspaceEndpoints();
 apiV1Group.MapAssetsEndpoints();
 apiV1Group.MapSubRegistersEndpoints();
 apiV1Group.MapInvitationsEndpoints();

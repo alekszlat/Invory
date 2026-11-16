@@ -126,6 +126,80 @@ namespace Invory.Migrations
                     b.ToTable("Assets");
                 });
 
+            modelBuilder.Entity("Invory.Models.BDModels.ChangeRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AssetId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ChangeReuestType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("OriginalAssetStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OriginalAssetVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OriginalLocation")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestedByEmail")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("RequestedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestedByUsername")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SubWorkspaceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("WorkspaceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId");
+
+                    b.HasIndex("SubWorkspaceId");
+
+                    b.HasIndex("WorkspaceId");
+
+                    b.ToTable("ChangeRequests");
+                });
+
             modelBuilder.Entity("Invory.Models.BDModels.History", b =>
                 {
                     b.Property<int>("Id")
@@ -535,6 +609,33 @@ namespace Invory.Migrations
                         .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("SubWorkspace");
+
+                    b.Navigation("Workspace");
+                });
+
+            modelBuilder.Entity("Invory.Models.BDModels.ChangeRequest", b =>
+                {
+                    b.HasOne("Invory.Models.BDModels.Asset", "Asset")
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Invory.Models.BDModels.SubWorkSpace", "SubWorkspace")
+                        .WithMany()
+                        .HasForeignKey("SubWorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Invory.Models.BDModels.WorkSpace", "Workspace")
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Asset");
 
                     b.Navigation("SubWorkspace");
 

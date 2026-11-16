@@ -1,14 +1,12 @@
-﻿namespace Invory.DTO
+﻿using Invory.Models.enums;
+
+namespace Invory.DTO
 {
     public record CreateChangeRequestDto(
-     int RegisterId,
-     int SubregisterId,
-     int AssetId,
-     string Kind="",
-     string Note="",
-     string Location="",
-     string Status="",
-     string Reason=""
+
+     string Note = "",
+     string Location = ""
+ 
  );
 
     public record RegisterSummaryDto(string Id, string Name);

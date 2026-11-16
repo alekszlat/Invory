@@ -123,7 +123,8 @@ namespace Invory.Endpoints
                     return TypedResults.BadRequest("Failed to process the invitation token.");
                 }
             })
-            .RequireAuthorization();
+            .RequireAuthorization().WithDescription("Workspace invitation, can be used by many people " +
+            ", has a check if user is already in the workspace");
 
 
 
@@ -242,7 +243,8 @@ namespace Invory.Endpoints
                     return TypedResults.BadRequest("Failed to process the invitation token.");
                 }
             })
-  .RequireAuthorization();
+  .RequireAuthorization().WithDescription("SubWorkspace invitation,if user isnt part of the workspace also joins the workspace" +
+  "Can be used by 1 person only, has a check if user is already in the workspace"); ;
 
 
 

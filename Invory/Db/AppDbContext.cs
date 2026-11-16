@@ -9,7 +9,7 @@ namespace Invory.Db
 {
     public class AppDbContext : IdentityDbContext<User, IdentityRole<int>, int>
     {
-        //public DbSet<PersonBookcs> PersonBookcs { get; set; }
+ 
 
         public DbSet<WorkSpace> WorkSpaces { get; set; }
         public DbSet<SubWorkSpace> SubWorkSpaces { get; set; }
@@ -19,7 +19,7 @@ namespace Invory.Db
         public DbSet<SubWorkspaceRoleUserTable> SubWorkspaceRoleUserTables { get; set; }
         public DbSet<WorkspaceInvitation> WorkspaceInvitations { get; set; }
         public DbSet<SubWorkspaceInvitation> SubWorkspaceInvitations { get; set; }
-
+        public DbSet<ChangeRequest> ChangeRequests { get; set; }
         public DbSet<History> WorkspaceHistory { get; set; }
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
 
@@ -98,6 +98,20 @@ namespace Invory.Db
             modelBuilder.Entity<SubWorkspaceInvitation>().Property(w=>w.InvitedAsRole).HasConversion<string>();
             modelBuilder.Entity<ChangeRequest>().Property(cR=>cR.Status).HasConversion<string>();
 
+
+            modelBuilder.Entity<ChangeRequest>(entity =>
+            {
+                // Ако в ChangeRequest класа имаш navigation properties (напр. public WorkSpace Workspace { get; set; }):
+                entity.HasOne(cr => cr.Workspace)
+                      .WithMany()
+                      .HasForeignKey(cr => cr.WorkspaceId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(cr => cr.SubWorkspace)
+                      .WithMany()
+                      .HasForeignKey(cr => cr.SubWorkspaceId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
         }
     }
 }

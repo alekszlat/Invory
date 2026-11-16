@@ -71,7 +71,7 @@ namespace Invory.HelperClasses
                 ref page,
                 ref pageSize
             );
-
+            
 
             var items = await assetsQuery.OrderByDescending(ass => ass.CreatedAt)
                 .Skip(skip)
@@ -79,6 +79,7 @@ namespace Invory.HelperClasses
                 .Select(ass => new AssetDtoPageDto(
                     ass.Id,
                     registerId,
+                    ass.SubWorkspaceId,
                     ass.Name,
                     ass.InventoryNumber,
                     ass.Location,
