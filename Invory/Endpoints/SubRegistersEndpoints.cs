@@ -234,10 +234,7 @@ namespace Invory.Endpoints
                     query = query.Where(cr => cr.Status == status);
                 }
 
-                if (query == null)
-                {
-                    return TypedResults.NotFound();
-                }
+              
                 int count = await query.CountAsync();
                 int totalPages;
                 int skip;
