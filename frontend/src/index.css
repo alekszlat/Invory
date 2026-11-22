@@ -1,1 +1,331 @@
+/*
+ * Invory's look is set in this file. Change a value here and every screen follows.
+ *
+ * 1. Palette: the light and dark colors, by role.
+ * 2. Theme: connects the palette, font, corners and shadows to Tailwind class names
+ *    such as bg-surface, text-ink-muted, rounded-card and shadow-card.
+ * 3. Base: page background, text, focus ring and selection.
+ * 4. Shared patterns: styles used by several components, such as .card and the asset table.
+ *
+ * Components use these names instead of hex codes, so they never need a dark: variant.
+ */
 @import "tailwindcss";
+@import "@fontsource-variable/sofia-sans";
+
+/* 1. Palette ------------------------------------------------------------------------------ */
+
+/* Every text color here passes WCAG AA (4.5:1) on the surfaces it is used on.
+   Check again with a contrast tool after changing one. */
+:root {
+  color-scheme: light;
+
+  /* Pages, raised panels, and table headers or dialog footers. */
+  --canvas: #f6f0e7;
+  --surface: #fffdf9;
+  --surface-muted: #f1e8dc;
+
+  /* Text and borders. line-strong outlines form fields, so it must reach 3:1 on surface. */
+  --ink: #2b1d14;
+  --ink-muted: #6a574a;
+  --line: #e5d9c9;
+  --line-strong: #9c8573;
+
+  /* Main buttons. */
+  --primary: #3d2618;
+  --primary-hover: #573a24;
+  --on-primary: #fff8ee;
+
+  /* Links, selections and the keyboard focus ring. */
+  --accent: #8e520a;
+  --accent-soft: #f6e4c4;
+  --focus: #8e520a;
+
+  /* The sidebar stays walnut in both themes. */
+  --sidebar: #2a1b12;
+  --sidebar-ink: #f4e9da;
+  --sidebar-muted: #c9b49d;
+  --sidebar-hover: #382519;
+  --sidebar-active: #45301f;
+  --brass: #e0a951;
+
+  /* Inventory number tags, drawn like the brass tag fixed to a real item. */
+  --tag: #f3dfb5;
+  --tag-ink: #4a2e0e;
+  --tag-line: #d3b377;
+
+  /* Statuses. Each one always has a text label too, so color is never the only cue. */
+  --success: #2f6a2c;
+  --success-soft: #e2efd8;
+  --warning: #7a4a00;
+  --warning-soft: #fae9c3;
+  --danger: #a3281c;
+  --danger-soft: #fae1db;
+
+  --backdrop: rgb(42 27 18 / 0.55);
+  --card-shadow: 0 1px 2px rgb(61 38 24 / 0.06), 0 6px 18px rgb(61 38 24 / 0.05);
+  --dialog-shadow: 0 24px 70px rgb(42 27 18 / 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --canvas: #1c1510;
+    --surface: #261d16;
+    --surface-muted: #31261d;
+
+    --ink: #f4eadd;
+    --ink-muted: #c4b19e;
+    --line: #3f3127;
+    --line-strong: #8d7764;
+
+    /* Brass buttons with walnut text read better on a dark page than walnut ones. */
+    --primary: #e3ab55;
+    --primary-hover: #eebf71;
+    --on-primary: #2a1b12;
+
+    --accent: #edba68;
+    --accent-soft: #46331e;
+    --focus: #edba68;
+
+    --sidebar: #140e0a;
+    --sidebar-hover: #241912;
+    --sidebar-active: #33251a;
+
+    --tag: #4a3519;
+    --tag-ink: #f5d9a3;
+    --tag-line: #7a5a2c;
+
+    --success: #a9d99c;
+    --success-soft: #243620;
+    --warning: #f2c877;
+    --warning-soft: #3e2f14;
+    --danger: #ffb3a5;
+    --danger-soft: #4a231c;
+
+    --backdrop: rgb(0 0 0 / 0.6);
+    --card-shadow: 0 1px 0 rgb(0 0 0 / 0.25);
+    --dialog-shadow: 0 24px 70px rgb(0 0 0 / 0.55);
+  }
+}
+
+/* 2. Theme -------------------------------------------------------------------------------- */
+
+/* "inline" makes each class read the variable at use time, so the dark values above apply. */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-ink: var(--sidebar-ink);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-brass: var(--brass);
+  --color-tag: var(--tag);
+  --color-tag-ink: var(--tag-ink);
+  --color-tag-line: var(--tag-line);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-backdrop: var(--backdrop);
+
+  --shadow-card: var(--card-shadow);
+  --shadow-dialog: var(--dialog-shadow);
+}
+
+@theme {
+  /* Sofia Sans comes from a Bulgarian type foundry. With lang="bg" on the page, the browser
+     uses its Bulgarian letter shapes (for example д, л and ж) instead of the Russian ones. */
+  --font-sans: "Sofia Sans Variable", system-ui, sans-serif;
+
+  /* Sofia Sans draws its letters smaller than most fonts, so each text size is one step above
+     Tailwind's default. Inputs use text-base, which must stay at 16px or more. */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-base: 1.0625rem;
+  --text-lg: 1.1875rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.625rem;
+  --text-3xl: 2rem;
+  --text-4xl: 2.625rem;
+
+  /* Corners grow with the size of the object: tags, then fields and buttons, then cards, then dialogs. */
+  --radius-tag: 0.25rem;
+  --radius-control: 0.625rem;
+  --radius-card: 0.875rem;
+  --radius-dialog: 1.25rem;
+}
+
+/* 3. Base --------------------------------------------------------------------------------- */
+
+@layer base {
+  html {
+    background-color: var(--canvas);
+  }
+
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+  }
+
+  ::selection {
+    background-color: var(--accent-soft);
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
+  }
+
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline-color: Highlight;
+    }
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+/* 4. Shared patterns ---------------------------------------------------------------------- */
+
+@layer components {
+  /* A raised panel. Register cards, request cards, the asset table and empty states share it. */
+  .card {
+    @apply rounded-card border border-line bg-surface shadow-card;
+  }
+
+  /* Text links are underlined, so they can be told apart without seeing color. */
+  .text-link {
+    @apply inline-flex min-h-11 items-center gap-1.5 font-semibold text-accent underline decoration-1 underline-offset-4 hover:decoration-2;
+  }
+
+  /* The sidebar is dark in both themes, so its focus ring switches to brass to stay visible. */
+  .app-sidebar {
+    --focus: var(--brass);
+  }
+
+  /* Dialogs rise in when they open. With reduced motion turned on, they simply appear. */
+  @media (prefers-reduced-motion: no-preference) {
+    .app-dialog[open] {
+      animation: dialog-in 180ms ease-out;
+    }
+
+    .app-dialog[open]::backdrop {
+      animation: backdrop-in 180ms ease-out;
+    }
+  }
+
+  /* The asset table. On wide screens it is an ordinary table. */
+  .asset-table {
+    @apply w-full text-left text-sm;
+
+    & thead {
+      @apply border-b border-line bg-surface-muted text-xs text-ink-muted;
+    }
+
+    & th,
+    & td {
+      @apply px-5 py-3.5 align-middle;
+    }
+
+    & thead th {
+      @apply font-semibold;
+    }
+
+    & tbody tr {
+      @apply border-line not-first:border-t hover:bg-surface-muted/60;
+    }
+  }
+
+  /* On phones each row becomes a small card. The column name is taken from data-label,
+     so the page never scrolls sideways. The status sits beside the asset name. */
+  @media (width < 48rem) {
+    .asset-table {
+      display: block;
+
+      & thead {
+        @apply sr-only;
+      }
+
+      & tbody {
+        display: block;
+      }
+
+      & tbody tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.25rem 1rem;
+        padding: 1rem 1.25rem;
+      }
+
+      & th,
+      & td {
+        padding: 0;
+        grid-column: 1 / -1;
+      }
+
+      & tbody th {
+        grid-column: 1;
+        grid-row: 1;
+      }
+
+      & td[data-label] {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        text-align: right;
+      }
+
+      & td[data-label]::before {
+        content: attr(data-label);
+        flex-shrink: 0;
+        overflow-wrap: normal;
+        @apply text-left text-ink-muted;
+      }
+
+      & td[data-cell="status"] {
+        grid-column: 2;
+        grid-row: 1;
+        align-self: start;
+      }
+
+      & td[data-cell="actions"] {
+        padding-top: 0.5rem;
+      }
+
+      & td[data-cell="empty"] {
+        padding: 1.5rem 0;
+      }
+    }
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    translate: 0 0.75rem;
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+}

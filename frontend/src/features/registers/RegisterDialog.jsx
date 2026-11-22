@@ -1,5 +1,4 @@
-import { Input, Textarea } from '../../shared/ui/FormControls.jsx';
-import Field from '../../shared/ui/Field.jsx';
+import { Field, Input, Textarea } from '../../shared/ui/FormControls.jsx';
 import FormDialog from '../../shared/ui/FormDialog.jsx';
 
 export default function RegisterDialog({ register, onClose, onSave }) {

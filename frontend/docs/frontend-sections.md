@@ -18,12 +18,12 @@ The three roles are explained in the [API guide](api-contract.md#who-is-allowed-
 
 **For:** everyone who is not logged in.
 
-One card with two modes. A link at the bottom switches between them.
+One form with two modes. A link at the bottom switches between them. On wide screens a dark panel beside the form says what Invory is for.
 
 - **Вход в профила** (log in): email and password.
 - **Създаване на профил** (sign up): full name, email, password of at least 8 characters, and the password again.
 
-The eye icon shows or hides the typed password. Problems appear right under the box they concern, such as "this email already has a profile". If the person arrived through an invitation link, a blue note says so, and the invitation opens as soon as they are in.
+The eye icon shows or hides the typed password. Problems appear right under the box they concern, such as "this email already has a profile". If the person arrived through an invitation link, a note says so, and the invitation opens as soon as they are in.
 
 Code: `src/features/auth/LoginPage.jsx`
 
@@ -31,8 +31,8 @@ Code: `src/features/auth/LoginPage.jsx`
 
 **For:** everyone who is logged in.
 
-- **Left menu:** the five sections below. **Заявки** shows a number when requests are waiting for a decision. **Нов регистър** at the bottom is a shortcut for creating a register. On phones the menu moves to the top.
-- **Top bar:** the current section's name, the person's name, and **Изход** (log out).
+- **Left menu:** the five sections below. **Заявки** shows a number when requests are waiting for a decision. **Нов регистър** at the bottom is a shortcut for creating a register. On phones the menu moves to the top and scrolls sideways.
+- **Top bar:** the current section's name (wider screens only), the person's name, and **Изход** (log out).
 - **Green and red strips** at the top of the page confirm that something was saved or explain what went wrong.
 
 Code: `src/app/AppShell.jsx`, `src/app/navigation.js`
@@ -41,7 +41,7 @@ Code: `src/app/AppShell.jsx`, `src/app/navigation.js`
 
 **For:** administrators. This is the home page.
 
-Shows a card for each register the person runs, with its description and number of assets. **Нов регистър** creates another one. A brand-new account sees an empty page with a button to create the first register.
+Shows a card for each register the person runs, with its description, number of assets and number of subregisters. The whole card opens the register. **Нов регистър** creates another one. A brand-new account sees an empty page with a button to create the first register.
 
 Code: `src/features/registers/RegisterList.jsx`, `RegisterCard.jsx`, `RegisterDialog.jsx`
 
@@ -49,7 +49,7 @@ Code: `src/features/registers/RegisterList.jsx`, `RegisterCard.jsx`, `RegisterDi
 
 **For:** the register's administrator. Opened from a card on the home page.
 
-- A table of assets with name, inventory number, location, person responsible, quantity, and status.
+- A table of assets with name, inventory number, location, person responsible, quantity, and status. Inventory numbers look like small brass tags, like the tag on the item itself. On phones each row becomes a small card.
 - A search box and a status filter. Long lists are split into pages.
 - **Добави актив** adds an asset.
 - **Подрегистри** jumps to this register's subregisters.
@@ -105,7 +105,7 @@ Code: `InviteDialog` in `src/features/subregisters/SubregisterDialogs.jsx`
 
 Opening the link leads to the sign-in page if needed, then to a short page with **Приеми поканата**. After accepting, the subregister opens and also appears under **Поканени регистри**.
 
-Code: `AcceptInvitation` in `src/App.jsx`
+Code: `src/features/invitations/AcceptInvitation.jsx`
 
 ## Поканени регистри (Registers I was invited to)
 

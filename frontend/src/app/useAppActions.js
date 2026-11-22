@@ -18,20 +18,39 @@ export function useAppActions({ userId, register, managed, subregister, invitedS
   }
   function refreshed(message) {
     reloadData();
-    setDialog(null); setNotice(message); setActionError('');
+    setDialog(null);
+    setNotice(message);
+    setActionError('');
   }
   // The error is thrown again so that FormDialog stays open and shows it next to the form.
   async function action(callback, message) {
     setActionError('');
-    try { const result = await callback(); refreshed(message); return result; }
-    catch (error) { setActionError(error.message); throw error; }
+    try {
+      const result = await callback();
+      refreshed(message);
+      return result;
+    } catch (error) {
+      setActionError(error.message);
+      throw error;
+    }
+  }
+  // A plain button has no FormDialog to catch the error, and action has already put it in actionError for the current view.
+  async function buttonAction(callback, message) {
+    try { await action(callback, message); } catch { /* The current view shows the error. */ }
   }
 
   async function accept(token) {
-    setAccepting(true); setActionError('');
-    try { const scope = await sharingApi.accept(token); refreshed('Поканата е приета.'); navigateTo(`invited/${scope.registerId}/${scope.id}`); }
-    catch (error) { setActionError(error.message); }
-    finally { setAccepting(false); }
+    setAccepting(true);
+    setActionError('');
+    try {
+      const scope = await sharingApi.accept(token);
+      refreshed('Поканата е приета.');
+      navigateTo(`invited/${scope.registerId}/${scope.id}`);
+    } catch (error) {
+      setActionError(error.message);
+    } finally {
+      setAccepting(false);
+    }
   }
   async function saveRegister(values) {
     const saved = await action(() => registersApi.create({ name: values.name, description: values.description }), 'Регистърът е създаден.');
@@ -49,7 +68,7 @@ export function useAppActions({ userId, register, managed, subregister, invitedS
     else await action(() => assetsApi.create(register.id, body), 'Активът е добавен в регистъра.');
   }
   async function archiveAsset(detail) {
-    try { await action(() => assetsApi.archive(detail.registerId, detail.assetId), 'Активът е архивиран.'); } catch { /* The current view shows the error. */ }
+    await buttonAction(() => assetsApi.archive(detail.registerId, detail.assetId), 'Активът е архивиран.');
   }
   async function saveSubregister(values) {
     const saved = await action(() => subregistersApi.create(managed.id, { name: values.name }), 'Подрегистърът е създаден.');
@@ -60,20 +79,22 @@ export function useAppActions({ userId, register, managed, subregister, invitedS
   }
   async function saveScope(values) {
     // Checkbox values are text, but asset IDs are integers in the API.
-    await action(() => subregistersApi.update(managed.id, subregister.id, { assetIds: values.assetIds.map(Number) }), 'Обхватът на подрегистъра е запазен.');
+    const body = { assetIds: values.assetIds.map(Number) };
+    await action(() => subregistersApi.update(managed.id, subregister.id, body), 'Обхватът на подрегистъра е запазен.');
   }
   async function observe(asset, values) {
     const body = { subregisterId: invitedScope.id, assetId: asset.id, kind: values.kind, note: values.note ?? '', location: values.location ?? '' };
-    await action(() => requestsApi.create(invitedScope.registerId, body), values.kind === 'present' ? 'Проверката е записана в историята.' : 'Заявката е изпратена до администратора.');
+    const message = values.kind === 'present' ? 'Проверката е записана в историята.' : 'Заявката е изпратена до администратора.';
+    await action(() => requestsApi.create(invitedScope.registerId, body), message);
   }
   async function decide(request, status, values) {
     await action(() => requestsApi.decide(request.id, { status, reason: values.reason ?? '' }), 'Решението е записано.');
   }
   async function updateMember(id, role) {
-    try { await action(() => sharingApi.updateMember(managed.id, subregister.id, id, { role }), 'Ролята е обновена.'); } catch { /* The current view shows the error. */ }
+    await buttonAction(() => sharingApi.updateMember(managed.id, subregister.id, id, { role }), 'Ролята е обновена.');
   }
   async function removeMember(id) {
-    try { await action(() => sharingApi.removeMember(managed.id, subregister.id, id), 'Достъпът е премахнат.'); } catch { /* The current view shows the error. */ }
+    await buttonAction(() => sharingApi.removeMember(managed.id, subregister.id, id), 'Достъпът е премахнат.');
   }
 
   return {

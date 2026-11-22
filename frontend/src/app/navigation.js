@@ -17,5 +17,6 @@ export function navigateTo(hash) {
 // An unknown section opens the register list, which is also the page for an empty hash.
 export function readRoute() {
   const [section, registerId, subregisterId] = window.location.hash.slice(1).split('/');
-  return { section: section === 'accept' || navigation.some(page => page.id === section) ? section : 'register', registerId, subregisterId };
+  const known = section === 'accept' || navigation.some(page => page.id === section);
+  return { section: known ? section : 'register', registerId, subregisterId };
 }

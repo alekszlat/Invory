@@ -1,5 +1,4 @@
-import { Input, Select } from '../../shared/ui/FormControls.jsx';
-import Field from '../../shared/ui/Field.jsx';
+import { Field, Input, Select } from '../../shared/ui/FormControls.jsx';
 import FormDialog from '../../shared/ui/FormDialog.jsx';
 
 export default function AssetDialog({ registerName, asset, onClose, onSave }) {

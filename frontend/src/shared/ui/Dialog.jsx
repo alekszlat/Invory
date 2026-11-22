@@ -27,14 +27,15 @@ export default function Dialog({ title, description, onClose, pending = false, c
         event.preventDefault();
         if (!pending) onClose();
       }}
-      className="fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-2xl border border-[#dcdde3] dark:border-[#3b3d46] bg-white dark:bg-[#232429] p-0 text-[#1d1d1f] dark:text-[#f1f1f4] overscroll-contain shadow-[0_24px_80px_rgb(0_0_0/0.22)] dark:shadow-[0_24px_80px_rgb(0_0_0/0.45)] backdrop:bg-[rgb(10_15_25/0.48)]"
+      // On phones the dialog sits at the bottom edge like a sheet, where the thumb can reach its buttons.
+      className="app-dialog fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-dialog border border-line bg-surface p-0 text-ink shadow-dialog backdrop:bg-backdrop max-sm:mb-0 max-sm:max-h-[calc(100dvh-1rem)] max-sm:w-full max-sm:rounded-b-none"
     >
-      <div className="flex items-start justify-between gap-4 border-b border-[#dcdde3] dark:border-[#3b3d46] p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-4 border-b border-line p-5 sm:p-6">
         <div className="min-w-0">
-          <h2 id={titleId} className="text-xl font-semibold tracking-tight wrap-anywhere">{title}</h2>
-          {description && <p id={descriptionId} className="mt-2 text-sm leading-relaxed text-[#62646c] dark:text-[#b0b2be] wrap-anywhere">{description}</p>}
+          <h2 id={titleId} className="text-xl leading-tight font-bold tracking-tight wrap-anywhere">{title}</h2>
+          {description && <p id={descriptionId} className="mt-1.5 text-sm leading-relaxed text-ink-muted wrap-anywhere">{description}</p>}
         </div>
-        <button type="button" onClick={onClose} disabled={pending} aria-label="Затвори" className="grid size-11 shrink-0 place-items-center rounded-xl text-[#62646c] dark:text-[#b0b2be] hover:bg-[#f0f1f4] dark:hover:bg-[#2b2d33] cursor-pointer disabled:cursor-wait disabled:opacity-60">
+        <button type="button" onClick={onClose} disabled={pending} aria-label="Затвори" className="-mt-1.5 -mr-1.5 grid size-11 shrink-0 cursor-pointer place-items-center rounded-control text-ink-muted hover:bg-surface-muted hover:text-ink disabled:cursor-wait disabled:opacity-60">
           <X size={20} aria-hidden="true" />
         </button>
       </div>

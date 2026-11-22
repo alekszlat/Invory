@@ -1,35 +1,40 @@
-import Dialog from '../../shared/ui/Dialog.jsx';
+import { Archive, Pencil } from 'lucide-react';
 
-// acquiredOn is a date without a time, and new Date() reads it as UTC midnight.
-// Formatting in UTC keeps time zones west of UTC from showing the previous day.
-const dateFormat = new Intl.DateTimeFormat('bg-BG', { dateStyle: 'medium', timeZone: 'UTC' });
-const quantityFormat = new Intl.NumberFormat('bg-BG');
+import { InventoryTag, StatusBadge } from '../../shared/ui/Badge.jsx';
+import Button from '../../shared/ui/Button.jsx';
+import Dialog from '../../shared/ui/Dialog.jsx';
+import { calendarDate, quantity } from '../../shared/formatters.js';
+import { assetStatusTones } from '../../shared/labels.js';
 
 export default function AssetDetails({ asset, onClose, onEdit, onArchive }) {
   const details = [
-    ['Инвентарен номер', asset.inventoryNumber],
     ['Местоположение', asset.location],
     ['Отговорник', asset.custodian],
-    ['Дата на придобиване', asset.acquiredOn ? dateFormat.format(new Date(asset.acquiredOn)) : ''],
-    ['Количество', `${quantityFormat.format(asset.quantity)} ${asset.unit}`],
-    ['Статус', asset.status],
+    ['Количество', `${quantity.format(asset.quantity)} ${asset.unit}`],
+    ['Дата на придобиване', asset.acquiredOn ? calendarDate.format(new Date(asset.acquiredOn)) : ''],
     ['Документ основание', asset.sourceDocument],
   ];
 
   return (
     <Dialog title={asset.name} description="Данни за актива" onClose={onClose}>
-      <dl className="p-5 sm:p-6 grid gap-5 sm:grid-cols-2">
+      <div className="flex flex-wrap items-center gap-2 px-5 pt-5 sm:px-6 sm:pt-6">
+        <InventoryTag>{asset.inventoryNumber}</InventoryTag>
+        <StatusBadge tone={assetStatusTones[asset.status]}>{asset.status}</StatusBadge>
+      </div>
+      <dl className="grid gap-x-6 gap-y-4 p-5 sm:grid-cols-2 sm:p-6">
         {details.map(([label, value]) => (
-          <div key={label} className="border-b border-[#dcdde3] dark:border-[#3b3d46] pb-3">
-            <dt className="text-sm text-[#62646c] dark:text-[#b0b2be]">{label}</dt>
-            <dd className="mt-1 text-sm font-semibold wrap-anywhere">{value || '—'}</dd>
+          <div key={label} className="border-b border-line pb-3">
+            <dt className="text-sm text-ink-muted">{label}</dt>
+            <dd className="mt-1 font-semibold wrap-anywhere">{value || '—'}</dd>
           </div>
         ))}
       </dl>
-      {(onEdit || onArchive) && <div className="flex justify-end gap-2 border-t border-[#dcdde3] p-5 dark:border-[#3b3d46]">
-        {onEdit && <button type="button" onClick={onEdit} className="text-sm font-semibold text-[#005ac1] dark:text-[#9bcaff]">Редактирай</button>}
-        {onArchive && <button type="button" onClick={onArchive} className="text-sm font-semibold text-[#b32830] dark:text-[#ffb1b8]">Архивирай</button>}
-      </div>}
+      {(onEdit || onArchive) && (
+        <div className="flex flex-wrap justify-end gap-2 border-t border-line bg-surface-muted px-5 py-4 sm:px-6">
+          {onArchive && <Button variant="danger" onClick={onArchive}><Archive size={17} aria-hidden="true" />Архивирай</Button>}
+          {onEdit && <Button onClick={onEdit}><Pencil size={17} aria-hidden="true" />Редактирай</Button>}
+        </div>
+      )}
     </Dialog>
   );
 }

@@ -1,8 +1,30 @@
-import { Select } from '../../shared/ui/FormControls.jsx';
-import PageHeader from '../../shared/ui/PageHeader.jsx';
-import EmptyState from '../../shared/ui/EmptyState.jsx';
-import { dateTime } from '../../shared/formatters.js';
 import { navigateTo } from '../../app/navigation.js';
+
+import EmptyState from '../../shared/ui/EmptyState.jsx';
+import { Alert, Loading } from '../../shared/ui/Feedback.jsx';
+import { Field, Select } from '../../shared/ui/FormControls.jsx';
+import PageHeader from '../../shared/ui/PageHeader.jsx';
+import { dateTime } from '../../shared/formatters.js';
+
+function Timeline({ events }) {
+  if (!events.length) return <EmptyState compact>В този обхват все още няма записани промени.</EmptyState>;
+
+  return (
+    <div className="card px-5 py-2 sm:px-6">
+      <ol className="ml-1.5 border-l-2 border-line">
+        {events.map(event => (
+          <li key={event.id} className="relative py-4 pl-6 before:absolute before:top-[1.4rem] before:-left-[0.45rem] before:size-3 before:rounded-full before:bg-brass before:ring-4 before:ring-surface">
+            <p className="font-semibold">{event.title}</p>
+            <p className="mt-0.5 text-sm text-ink-muted wrap-anywhere">{event.details}</p>
+            <p className="mt-1.5 text-xs text-ink-muted">
+              <time dateTime={event.at}>{dateTime.format(new Date(event.at))}</time>, {event.actor.name}
+            </p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
 export default function HistoryView({ scopes, selected, events, loading, error }) {
   return (
@@ -10,24 +32,13 @@ export default function HistoryView({ scopes, selected, events, loading, error }
       <PageHeader title="История" description="Изберете регистър или подрегистър, за да видите промените в достъпния обхват." />
       {scopes.length ? (
         <>
-          <label className="grid min-w-0 gap-2 text-sm font-medium mb-5 max-w-lg">
-            Регистър за преглед
+          <Field label="Регистър за преглед" className="mb-6 max-w-lg">
             <Select value={selected.path} onChange={event => navigateTo(`history/${event.target.value}`)}>
               {scopes.map(scope => <option key={scope.path} value={scope.path}>{scope.label}</option>)}
             </Select>
-          </label>
-          {error && <p role="alert">{error.message}</p>}
-          {loading ? <p role="status">Зареждане на история…</p> : events.length ? (
-            <ol className="divide-y divide-[#dcdde3] dark:divide-[#3b3d46] rounded-2xl border border-[#dcdde3] dark:border-[#3b3d46] bg-white dark:bg-[#232429] px-5 sm:px-6">
-              {events.map(event => (
-                <li className="relative py-5 pl-6 before:absolute before:top-6 before:left-0 before:size-2 before:rounded-full before:bg-[#005ac1] dark:before:bg-[#9bcaff] before:content-['']" key={event.id}>
-                  <time className="text-xs text-[#62646c] dark:text-[#b0b2be]" dateTime={event.at}>{dateTime.format(new Date(event.at))} · {event.actor.name}</time>
-                  <p className="mt-1 font-semibold">{event.title}</p>
-                  <p className="mt-1 text-sm text-[#62646c] dark:text-[#b0b2be] wrap-anywhere">{event.details}</p>
-                </li>
-              ))}
-            </ol>
-          ) : <EmptyState compact>В този обхват все още няма записани промени.</EmptyState>}
+          </Field>
+          {error && <Alert className="mb-4">{error.message}</Alert>}
+          {loading ? <Loading>Зареждане на история…</Loading> : <Timeline events={events} />}
         </>
       ) : <EmptyState compact>Все още няма регистър или подрегистър, чиято история да прегледате.</EmptyState>}
     </>
